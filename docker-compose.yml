@@ -29,6 +29,8 @@ services:
     environment:
       FACTORY_WORKSPACE: /workspace
       FACTORY_DATA: /data
+      # Package cache on a volume, not in the 512 MB RAM-backed HOME (a NuGet restore needs about 400 MB).
+      NUGET_PACKAGES: /cache/nuget
 
     mem_limit: 4g
     cpus: 2.0
@@ -41,6 +43,7 @@ services:
     volumes:
       - workspace:/workspace        # clones and worktrees
       - data:/data                  # events and logs
+      - cache:/cache                # NuGet package cache, survives restarts
       - ./projects:/app/projects:ro # registry, read-only
 
   web:
@@ -82,3 +85,4 @@ services:
 volumes:
   workspace:
   data:
+  cache:
