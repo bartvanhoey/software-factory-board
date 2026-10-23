@@ -50,8 +50,8 @@ RUN npm install -g --allow-scripts=@anthropic-ai/claude-code "@anthropic-ai/clau
 RUN userdel -r node \
  && groupadd --gid "${FACTORY_UID}" factory \
  && useradd --uid "${FACTORY_UID}" --gid factory --home-dir /home/factory --shell /usr/sbin/nologin factory \
- && mkdir -p /workspace /data /home/factory \
- && chown -R factory:factory /workspace /data /home/factory
+ && mkdir -p /workspace /data /cache /home/factory \
+ && chown -R factory:factory /workspace /data /cache /home/factory
 
 COPY --chmod=0755 docker/entrypoint.sh /usr/local/bin/factory-entrypoint
 

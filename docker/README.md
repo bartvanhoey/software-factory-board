@@ -51,7 +51,7 @@ To bump a base image: `docker pull <tag>`, `docker inspect --format '{{index .Re
 | non-root user `factory` (uid 10001) | no root, no sudo, no login shell |
 | `read_only: true` | root filesystem is immutable |
 | `tmpfs` on `/tmp` (noexec) and `/home/factory` | scratch space only, wiped on restart |
-| named volumes `workspace`, `data` | the only persistent writable paths |
+| named volumes `workspace`, `data`, `cache` | the only persistent writable paths (`cache` holds the NuGet packages, `NUGET_PACKAGES=/cache/nuget`) |
 | `./projects` mounted `:ro` | registry cannot be changed from inside |
 | `cap_drop: [ALL]` | empty capability set |
 | `no-new-privileges` | setuid binaries cannot escalate |
