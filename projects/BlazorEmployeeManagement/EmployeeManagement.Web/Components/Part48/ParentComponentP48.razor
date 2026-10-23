@@ -1,0 +1,11 @@
+@page "/pcpart48" 
+
+<h1 style="@Style">Parent Component Text</h1>
+
+<CascadingValue Value=@Style>
+  <ChildComponentP48></ChildComponentP48>
+</CascadingValue>
+
+@code {
+   public string Style { get; set; } = "color:red";
+}

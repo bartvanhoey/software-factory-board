@@ -1,0 +1,28 @@
+@page "/pcpart50" 
+
+<button class="btn btn-primary" @onclick=IncrementCounter>Increment Counter</button>
+
+<h1 style="@Style">Parent Component Text - @Counter</h1>
+
+<CascadingValue Value="@Counter" Name="Counter" IsFixed="false">
+  <CascadingValue Value="@Style" Name="ColorStyle" IsFixed="true">
+    <CascadingValue Value="@BorderStyle" Name="BorderStyle" IsFixed="true" >
+      <CascadingValue Value="@EmployeeAge" IsFixed="true">
+        <ChildComponentP50></ChildComponentP50>
+      </CascadingValue>
+    </CascadingValue>
+  </CascadingValue>
+</CascadingValue>
+
+@code {
+  public string Style { get; set; } = "color:red";
+      public string BorderStyle { get; set; } = "border:1px solid red";
+      public int EmployeeAge { get; set; } = 25;
+
+      public int Counter { get; set; } = 0;
+
+      private void IncrementCounter()
+      {
+          Counter++;
+      }
+}

@@ -1,0 +1,10 @@
+<h1 style="@ElementStyle; @H1Border">-Child Component Text | age: @EmployeeAge - @Counter</h1>
+
+<GrandChildComponentP50></GrandChildComponentP50>
+
+@code{
+  [CascadingParameter(Name="ColorStyle")] public string ElementStyle { get; set; }
+  [CascadingParameter(Name="BorderStyle")] public string H1Border { get; set; }
+  [CascadingParameter] public int EmployeeAge { get; set; }
+  [CascadingParameter(Name="Counter")] public int Counter { get; set; }
+}

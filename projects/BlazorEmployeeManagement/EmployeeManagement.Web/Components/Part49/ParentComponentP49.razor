@@ -1,0 +1,17 @@
+@page "/pcpart49" 
+
+<h1 style="@Style">Parent Component Text</h1>
+
+<CascadingValue Value="@Style" Name="ColorStyle">
+  <CascadingValue Value="@BorderStyle" Name="BorderStyle" >
+    <CascadingValue Value="@EmployeeAge">
+      <ChildComponentP49></ChildComponentP49>
+    </CascadingValue>
+  </CascadingValue>
+</CascadingValue>
+
+@code {
+  public string Style { get; set; } = "color:red";
+  public string BorderStyle { get; set; } = "border:1px solid red";
+  public int EmployeeAge { get; set; } = 25;
+}
