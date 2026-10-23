@@ -363,3 +363,7 @@ data/
 
 # Secrets
 .env
+
+.env.local
+.env*.local
+next-env.d.ts

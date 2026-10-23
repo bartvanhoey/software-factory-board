@@ -60,8 +60,18 @@ COPY --chmod=0755 docker/entrypoint.sh /usr/local/bin/factory-entrypoint
 WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY shared/package.json shared/
+COPY web/package.json web/
 RUN npm ci
 COPY shared shared
+COPY web web
+# Built once at image build; `next start` serves it (see the web service in compose).
+# `next build` occasionally dies with a V8 crash (exit 133/139, about 1 build in 15 on
+# Docker Desktop/WSL2) and then passes unchanged on the next try, so retry a few times.
+RUN for attempt in 1 2 3; do \
+      NEXT_TELEMETRY_DISABLED=1 npm run build -w web && exit 0; \
+      echo "next build crashed (attempt $attempt of 3), retrying" >&2; \
+    done; \
+    exit 1
 
 ENV HOME=/home/factory \
     DOTNET_NOLOGO=1 \
@@ -69,6 +79,7 @@ ENV HOME=/home/factory \
     DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1 \
     DOTNET_GENERATE_ASPNET_CERTIFICATE=false \
     DISABLE_AUTOUPDATER=1 \
+    NEXT_TELEMETRY_DISABLED=1 \
     GH_PROMPT_DISABLED=1 \
     GIT_TERMINAL_PROMPT=0
 

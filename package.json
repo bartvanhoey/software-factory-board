@@ -1,7 +1,7 @@
 {
   "name": "software-factory-board",
   "private": true,
-  "workspaces": ["shared"],
+  "workspaces": ["shared", "web"],
   "allowScripts": {
     "esbuild": true
   },
