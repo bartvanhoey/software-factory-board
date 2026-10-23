@@ -1,1 +1,1 @@
-# board-software-factory
+# Software Factory Board
