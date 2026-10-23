@@ -1,0 +1,13 @@
+{
+  "name": "software-factory-board",
+  "private": true,
+  "workspaces": ["shared"],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "validate": "npm run validate -w shared"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

@@ -352,3 +352,11 @@ MigrationBackup/
 # Node / Claude Code local
 node_modules/
 .claude/settings.local.json
+
+# Software factory
+node_modules/
+dist/
+.next/
+local.json
+data/
+*.tsbuildinfo
