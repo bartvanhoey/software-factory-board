@@ -1,0 +1,38 @@
+services:
+  runner:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: software-factory-runner:dev
+    restart: unless-stopped
+
+    # Placeholder: idle so `up` does not exit and restart in a loop.
+    # Replaced by the runner start command in the next step.
+    command: ["sleep", "infinity"]
+
+    # Secrets come from .env (gitignored), never from the image.
+    env_file: .env
+
+    # --- hardening ---------------------------------------------------------
+    read_only: true                 # root filesystem is immutable
+    cap_drop: [ALL]                 # no Linux capabilities
+    security_opt:
+      - no-new-privileges:true      # setuid binaries cannot escalate
+    pids_limit: 512                 # fork-bomb guard
+    mem_limit: 4g
+    cpus: 2.0
+    init: true                      # reap zombie processes from agent runs
+
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=512m
+      # HOME holds tool config (gh, claude, dotnet). It is wiped on every restart.
+      - /home/factory:rw,nosuid,uid=10001,gid=10001,mode=0700,size=512m
+
+    volumes:
+      - workspace:/workspace        # clones and worktrees
+      - data:/data                  # events and logs
+      - ./projects:/app/projects:ro # registry, read-only
+
+volumes:
+  workspace:
+  data:
