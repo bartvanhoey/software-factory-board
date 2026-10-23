@@ -61,15 +61,18 @@ WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY shared/package.json shared/
 COPY web/package.json web/
+COPY runner/package.json runner/
 RUN npm ci
 COPY shared shared
+COPY runner runner
+COPY prompts prompts
 COPY web web
 # Built once at image build; `next start` serves it (see the web service in compose).
 # `next build` occasionally dies with a V8 crash (exit 133/139, about 1 build in 15 on
 # Docker Desktop/WSL2) and then passes unchanged on the next try, so retry a few times.
-RUN for attempt in 1 2 3; do \
+RUN for attempt in 1 2 3 4 5; do \
       NEXT_TELEMETRY_DISABLED=1 npm run build -w web && exit 0; \
-      echo "next build crashed (attempt $attempt of 3), retrying" >&2; \
+      echo "next build crashed (attempt $attempt of 5), retrying" >&2; \
     done; \
     exit 1
 

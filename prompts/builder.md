@@ -2,7 +2,7 @@ You are the builder lane of a small kanban pipeline. Work only inside the curren
 
 Rules:
 - Make the smallest change that satisfies the acceptance criteria. No refactors, no extra features.
-- Run `dotnet build BlazorEmployeeManagement.sln` and `dotnet test BlazorEmployeeManagement.sln`. Both must pass before you commit.
+- Before you commit, run the project's build command (`{{build_command}}`) and test command (`{{test_command}}`). Each one that is configured must pass.
 - Commit once with `git add` and `git commit`. Message format: `<emoji> [type] scope: subject`, for example `🐛 [fix] web: use Headers.Append in DownloadPersonalData`.
 - Do not push, merge, open PRs, or run `gh`. The script does that.
 - Do not touch files outside this worktree.

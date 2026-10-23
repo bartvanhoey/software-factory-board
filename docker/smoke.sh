@@ -8,7 +8,8 @@ SVC=runner
 FAIL=0
 
 # Run a command inside a throwaway container with the same settings as compose.
-run() { docker compose run --rm --no-deps -T --entrypoint "" "$SVC" "$@"; }
+# stdin is closed on purpose: a check such as `su` would otherwise wait for a password forever.
+run() { docker compose run --rm --no-deps -T --entrypoint "" "$SVC" "$@" </dev/null; }
 
 check() { # check <description> <expected: pass|fail> <command...>
   local desc="$1" want="$2"; shift 2
@@ -47,7 +48,7 @@ docker run --rm --entrypoint sh software-factory-runner:dev -c 'env | grep -E "^
   && { echo "FAIL  image contains a secret in its env"; FAIL=1; } || echo "ok    image env has no secrets"
 
 echo "== web service (needs: docker compose up -d web)"
-wexec() { docker compose exec -T web "$@"; }
+wexec() { docker compose exec -T web "$@" </dev/null; }
 wcheck() { # wcheck <description> <expected: pass|fail> <command...>
   local desc="$1" want="$2"; shift 2
   if wexec "$@" >/dev/null 2>&1; then got=pass; else got=fail; fi
