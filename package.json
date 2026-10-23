@@ -2,6 +2,9 @@
   "name": "software-factory-board",
   "private": true,
   "workspaces": ["shared"],
+  "allowScripts": {
+    "esbuild": true
+  },
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",

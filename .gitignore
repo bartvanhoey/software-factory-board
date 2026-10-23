@@ -360,3 +360,6 @@ dist/
 local.json
 data/
 *.tsbuildinfo
+
+# Secrets
+.env

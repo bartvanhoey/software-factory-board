@@ -1,0 +1,12 @@
+.git
+.github
+**/node_modules
+**/dist
+.next
+.env
+.env.*
+!.env.example
+local.json
+data
+*.md
+!docker/README.md
