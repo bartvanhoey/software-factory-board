@@ -20,11 +20,15 @@ services:
     image: software-factory-runner:dev
 
     # Placeholder: idle so `up` does not exit and restart in a loop.
-    # Replaced by the runner start command in the next step.
+    # Use the CLI with: docker compose exec runner npm run runner -- build --project <name>.
+    # The scheduler that runs lanes on a timer replaces this later.
     command: ["sleep", "infinity"]
 
     # Secrets come from .env (gitignored), never from the image.
     env_file: .env
+    environment:
+      FACTORY_WORKSPACE: /workspace
+      FACTORY_DATA: /data
 
     mem_limit: 4g
     cpus: 2.0

@@ -1,14 +1,15 @@
 {
   "name": "software-factory-board",
   "private": true,
-  "workspaces": ["shared", "web"],
+  "workspaces": ["shared", "web", "runner"],
   "allowScripts": {
     "esbuild": true
   },
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "validate": "npm run validate -w shared"
+    "validate": "npm run validate -w shared",
+    "runner": "npm run runner -w runner --"
   },
   "devDependencies": {
     "typescript": "^5.6.0"

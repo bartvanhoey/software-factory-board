@@ -1,7 +1,7 @@
 # Docker sandbox
 
-Hardened container for the factory runner. The entrypoint is a placeholder that
-prints the toolchain versions; the Node runner replaces it later.
+Hardened container for the factory runner and dashboard. The entrypoint prints the toolchain
+versions and then runs the given command.
 
 ## Use
 
@@ -20,7 +20,7 @@ Both run the same image.
 
 | Service | Command | Notes |
 | --- | --- | --- |
-| `runner` | `sleep infinity` (placeholder) | gets `.env` (`GH_TOKEN`, `ANTHROPIC_API_KEY`) |
+| `runner` | `sleep infinity` (idle) | gets `.env` (`GH_TOKEN`, `ANTHROPIC_API_KEY`); run lanes with `docker compose exec runner npm run runner -- ...`, see `runner/README.md` |
 | `web` | `next start` on port 2999 | dashboard at http://localhost:2999, bound to `127.0.0.1` only |
 
 The dashboard has no login, so the port is published on localhost only. To expose it on your LAN,
