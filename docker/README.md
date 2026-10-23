@@ -10,9 +10,25 @@ cp .env.example .env        # fill in GH_TOKEN and ANTHROPIC_API_KEY
 docker compose build
 docker compose run --rm --no-deps runner true   # prints toolchain versions
 bash docker/smoke.sh                            # verifies the hardening
-docker compose up -d                            # idles until the runner exists
+docker compose up -d                            # starts the runner (idle) and the dashboard
 docker compose down
 ```
+
+## Services
+
+Both run the same image.
+
+| Service | Command | Notes |
+| --- | --- | --- |
+| `runner` | `sleep infinity` (placeholder) | gets `.env` (`GH_TOKEN`, `ANTHROPIC_API_KEY`) |
+| `web` | `next start` on port 2999 | dashboard at http://localhost:2999, bound to `127.0.0.1` only |
+
+The dashboard has no login, so the port is published on localhost only. To expose it on your LAN,
+change the port mapping in `docker-compose.yml` to `"2999:2999"` and put auth in front first.
+
+`web` never receives the runner's `GH_TOKEN` (it can write) or `ANTHROPIC_API_KEY`. It reads
+`WEB_GH_TOKEN` from `.env`, which should be a read-only token. Leave it empty to see demo data.
+Its code is baked into the image, so rebuild after changes: `docker compose up -d --build`.
 
 On Windows Git Bash, prefix with `MSYS_NO_PATHCONV=1` if paths get mangled.
 
