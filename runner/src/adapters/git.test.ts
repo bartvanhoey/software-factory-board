@@ -147,3 +147,34 @@ describe("gitCli.commitAll and statusPaths", () => {
     expect([...paths].sort()).toEqual(["dir/new file.txt", "dir/other.txt", "renamed file.txt"]);
   });
 });
+
+describe("gitCli.push", () => {
+  it("pushes a branch, and refuses a non-fast-forward instead of forcing it", async () => {
+    const bare = join(root, "remote.git");
+    execFileSync("git", ["init", "-q", "--bare", bare]);
+    git("remote", "add", "origin", bare);
+    const remoteSha = () => execFileSync("git", ["-C", bare, "rev-parse", "feature"], { encoding: "utf8" }).trim();
+
+    await gitCli.push(repo, "feature");
+    const pushed = git("rev-parse", "feature").trim();
+    expect(remoteSha()).toBe(pushed);
+
+    // Rewrite the branch locally, so a plain push would have to be forced.
+    git("checkout", "-q", "feature");
+    git("commit", "-q", "--amend", "-m", "rewritten");
+    expect(git("rev-parse", "feature").trim()).not.toBe(pushed);
+    await expect(gitCli.push(repo, "feature")).rejects.toThrow(/failed \(exit/);
+    expect(remoteSha()).toBe(pushed); // the remote history was not rewritten
+  });
+
+  it("fast-forwards new commits onto the pushed branch", async () => {
+    const bare = join(root, "remote.git");
+    execFileSync("git", ["init", "-q", "--bare", bare]);
+    git("remote", "add", "origin", bare);
+    await gitCli.push(repo, "feature");
+    git("checkout", "-q", "feature");
+    commitFile("c.txt", "more\n", "more work");
+    await gitCli.push(repo, "feature");
+    expect(execFileSync("git", ["-C", bare, "rev-parse", "feature"], { encoding: "utf8" }).trim()).toBe(git("rev-parse", "feature").trim());
+  });
+});

@@ -6,6 +6,7 @@ export const EVENT_TYPES = [
   "started",
   "noop",
   "claimed",
+  "reworking",
   "agent_done",
   "autocommitted",
   "verified",

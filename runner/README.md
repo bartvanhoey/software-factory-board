@@ -30,7 +30,8 @@ docker compose exec runner npm run runner -- review --project <name> [--issue <n
 
 1. Creates any missing `ready`, `building`, `qa`, `review` labels (grey, blue, yellow, green). It only
    creates: existing labels keep their colour and description.
-2. Picks the oldest `ready` issue (or `--issue`), and fetches the project's `defaultBranch`. A wrong
+2. Picks a card: a `building` card to **rework** first (see below), else the oldest `ready` issue. With `--issue`,
+   a `ready` card is built and a `building` card is reworked. It fetches the project's `defaultBranch`; a wrong
    branch name fails here, before anything is claimed.
 3. Claims it: assigns the bot, `ready` becomes `building`.
 4. Creates a worktree `issue-<n>` from `origin/<defaultBranch>` and runs `claude -p` in it.
@@ -45,6 +46,31 @@ docker compose exec runner npm run runner -- review --project <name> [--issue <n
    GitHub compare link (`<default>...issue-<n>`).
 
 On a failure after the claim, the lane comments on the issue and the card stays in `building`.
+
+## Rework: a card that qa or review sent back
+
+A card in `building` that already has a branch used to wait for a human. Now the build lane continues on that
+branch. A `building` card is **reworked** when all of these hold:
+
+1. Branch `issue-<n>` exists on `origin`.
+2. The latest factory verdict on the issue is `[qa] fail at <sha>` or `[review] changes requested at <sha>`
+   (written by the runner's own `gh` login; comments from anyone else are ignored). A later pass, approval or
+   inconclusive result cancels it.
+3. That `<sha>` is the branch's current head. If someone pushed since, the feedback may be stale: the card is
+   **not** reworked, and you send it to `qa` by hand. `--issue` never bypasses this.
+4. No `[build]` comment is newer than the feedback. A failed rework comments `[build] failed`, which parks the
+   card, so a scheduler cannot loop on it. `--issue` ignores this rule, which is how you retry.
+5. Fewer than `limits.maxReworks` (default `2`, `0` turns it off) reworks finished (`[build] rework done`
+   comments). `--issue` ignores this rule too.
+
+Rework cards are picked before `ready` cards, oldest first. The run:
+
+- creates the worktree at the branch's current head (pinned), and starts the agent with `prompts/rework.md`
+  (or `prompts.rework`), the issue, and the feedback comment quoted as data in a fenced block;
+- counts new commits from that head, commits left-over changes itself as in a fresh build (same secret guard),
+  runs the independent build or test, and pushes as a plain fast-forward (never forced);
+- moves the card to `qa` with `[build] rework done (round <k>). Pushed <n> commit(s) to issue-<n> (compare: <url>).
+  Addressed: <first reason>.`, and opens no PR. A failure leaves the card in `building`.
 
 ## What the qa lane does
 

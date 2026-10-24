@@ -95,6 +95,11 @@ export function reviewPromptPath(project: Project): string {
   return join(REPO_ROOT, project.prompts.review ?? join("prompts", "review.md"));
 }
 
+/** The rework prompt file: the project's own override (relative to the repo root), else the default. */
+export function reworkPromptPath(project: Project): string {
+  return join(REPO_ROOT, project.prompts.rework ?? join("prompts", "rework.md"));
+}
+
 export const logDirFor = (settings: Settings, project: Project): string => join(settings.dataDir, "logs", project.name);
 export const lockDirFor = (settings: Settings, project: Project): string => join(settings.dataDir, "locks", `${project.name}.lock`);
 export const eventsFile = (settings: Settings): string => join(settings.dataDir, "events.jsonl");

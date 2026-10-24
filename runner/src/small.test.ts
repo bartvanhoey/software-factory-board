@@ -68,7 +68,7 @@ describe("renderPrompt / allowedToolsFor / verifyStep", () => {
   });
 
   it("renders the real prompt files, using the project's default branch and no hard-coded one", () => {
-    for (const name of ["builder.md", "qa.md", "review.md"]) {
+    for (const name of ["builder.md", "qa.md", "review.md", "rework.md"]) {
       const template = readFileSync(join(REPO_ROOT, "prompts", name), "utf8");
       for (const defaultBranch of ["main", "master", "develop"]) {
         const text = renderPrompt(template, project({ defaultBranch, commands: { build: "make", test: "make test" } }));
@@ -80,6 +80,8 @@ describe("renderPrompt / allowedToolsFor / verifyStep", () => {
     }
     const qa = readFileSync(join(REPO_ROOT, "prompts", "qa.md"), "utf8");
     expect(renderPrompt(qa, project({ defaultBranch: "master" }))).toContain("`git diff origin/master...HEAD`");
+    const rework = readFileSync(join(REPO_ROOT, "prompts", "rework.md"), "utf8");
+    expect(renderPrompt(rework, project({ defaultBranch: "master" }))).toContain("git diff origin/master...HEAD");
     const review = readFileSync(join(REPO_ROOT, "prompts", "review.md"), "utf8");
     expect(renderPrompt(review, project({ defaultBranch: "master" }))).toContain("git diff origin/master...<commit under review>");
   });
