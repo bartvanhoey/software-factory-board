@@ -1,4 +1,5 @@
 // No "server-only" or next/* imports: vitest and the break-glass CLI load this outside Next.
+import { checkPassword } from "./policy";
 
 export interface SmtpConfig {
   host: string;
@@ -16,6 +17,8 @@ export interface AuthConfig {
   /** Set only when emailVerification is on. */
   smtp: SmtpConfig | null;
   cookieSecure: boolean;
+  /** Believe X-Forwarded-For (set by a reverse proxy we control). Off = no per-IP limits. */
+  trustProxy: boolean;
   /** First-admin seed. Both values or neither. */
   admin: { email: string; password: string } | null;
 }
@@ -77,6 +80,7 @@ export function loadAuthConfig(env: Env = process.env): AuthConfig {
   }
 
   const cookieSecure = bool("COOKIE_SECURE", env.NODE_ENV === "production");
+  const trustProxy = bool("TRUST_PROXY", false);
 
   let admin: AuthConfig["admin"] = null;
   const adminEmail = get("ADMIN_EMAIL");
@@ -85,13 +89,21 @@ export function loadAuthConfig(env: Env = process.env): AuthConfig {
     if (!adminEmail || !adminPassword) problems.push("ADMIN_EMAIL and ADMIN_PASSWORD must be set together");
     else {
       if (adminEmail.length > 254 || !EMAIL.test(adminEmail)) problems.push("ADMIN_EMAIL must be an email address");
-      if (adminPassword.length < 12 || adminPassword.length > 128) {
-        problems.push("ADMIN_PASSWORD must be 12-128 characters");
-      }
+      const weak = checkPassword(adminPassword, adminEmail);
+      if (weak) problems.push(`ADMIN_PASSWORD: ${weak}`);
       admin = { email: adminEmail.toLowerCase(), password: adminPassword };
     }
   }
 
   if (problems.length > 0) throw new ConfigError(problems);
-  return { dbPath, mfaKey, emailVerification, smtp, cookieSecure, admin };
+  return { dbPath, mfaKey, emailVerification, smtp, cookieSecure, trustProxy, admin };
+}
+
+// Next bundles proxy, instrumentation and pages separately; share one parsed config per process.
+const cache = globalThis as { __authConfig?: AuthConfig };
+
+/** The validated config for this process. startAuth() has already exited if it is invalid. */
+export function getAuthConfig(): AuthConfig {
+  cache.__authConfig ??= loadAuthConfig();
+  return cache.__authConfig;
 }

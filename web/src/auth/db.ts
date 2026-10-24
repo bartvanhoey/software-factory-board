@@ -55,6 +55,19 @@ export function migrate(db: DatabaseSync, list: readonly Migration[]): void {
   }
 }
 
+/** Runs fn (synchronous, no awaits) as one write transaction, so a crash cannot leave half of it behind. */
+export function transaction<T>(db: DatabaseSync, fn: () => T): T {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const result = fn();
+    db.exec("COMMIT");
+    return result;
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
+}
+
 // Next bundles instrumentation and route handlers separately, so a module-level variable would open the file twice.
 const cache = globalThis as { __authDb?: DatabaseSync };
 

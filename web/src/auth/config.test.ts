@@ -22,6 +22,7 @@ describe("loadAuthConfig", () => {
     expect(cfg.emailVerification).toBe(false);
     expect(cfg.smtp).toBeNull();
     expect(cfg.cookieSecure).toBe(false);
+    expect(cfg.trustProxy).toBe(false);
     expect(cfg.admin).toBeNull();
   });
 
@@ -65,6 +66,11 @@ describe("loadAuthConfig", () => {
     expect(problemsOf({ MFA_ENCRYPTION_KEY: KEY, EMAIL_VERIFICATION: "yes" })).toEqual([expect.stringContaining("EMAIL_VERIFICATION must be")]);
   });
 
+  it("reads TRUST_PROXY and rejects a non-boolean", () => {
+    expect(loadAuthConfig({ MFA_ENCRYPTION_KEY: KEY, TRUST_PROXY: "true" }).trustProxy).toBe(true);
+    expect(problemsOf({ MFA_ENCRYPTION_KEY: KEY, TRUST_PROXY: "1" })).toEqual([expect.stringContaining("TRUST_PROXY must be")]);
+  });
+
   it("needs ADMIN_EMAIL and ADMIN_PASSWORD together", () => {
     expect(problemsOf({ MFA_ENCRYPTION_KEY: KEY, ADMIN_EMAIL: "a@example.com" })).toEqual([expect.stringContaining("set together")]);
     expect(problemsOf({ MFA_ENCRYPTION_KEY: KEY, ADMIN_PASSWORD: "correct horse battery" })).toEqual([expect.stringContaining("set together")]);
@@ -73,7 +79,7 @@ describe("loadAuthConfig", () => {
   it("lowercases the admin email and enforces the password length", () => {
     const cfg = loadAuthConfig({ MFA_ENCRYPTION_KEY: KEY, ADMIN_EMAIL: "Admin@Example.com", ADMIN_PASSWORD: "correct horse battery" });
     expect(cfg.admin).toEqual({ email: "admin@example.com", password: "correct horse battery" });
-    expect(problemsOf({ MFA_ENCRYPTION_KEY: KEY, ADMIN_EMAIL: "a@example.com", ADMIN_PASSWORD: "short" })).toEqual([expect.stringContaining("12-128")]);
+    expect(problemsOf({ MFA_ENCRYPTION_KEY: KEY, ADMIN_EMAIL: "a@example.com", ADMIN_PASSWORD: "short" })).toEqual([expect.stringContaining("at least 12")]);
   });
 
   it("reports every problem at once", () => {

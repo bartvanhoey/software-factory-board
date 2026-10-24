@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { UserMenu } from "@/components/auth/UserMenu";
 import type { BoardData } from "@/lib/types";
 
 export function Header({ board, title = "Software Factory Board" }: { board: BoardData; title?: string }) {
@@ -8,9 +9,12 @@ export function Header({ board, title = "Software Factory Board" }: { board: Boa
       <h1 className="text-xl font-semibold tracking-tight">
         <Link href="/">{title}</Link>
       </h1>
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
-        {board.source === "live" ? "Live from GitHub" : "Demo data"} · updated {time} UTC · refreshes every 30 s
-      </p>
+      <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          {board.source === "live" ? "Live from GitHub" : "Demo data"} · updated {time} UTC · refreshes every 30 s
+        </p>
+        <UserMenu />
+      </div>
     </header>
   );
 }

@@ -23,8 +23,8 @@ Both run the same image.
 | `runner` | `sleep infinity` (idle) | gets `.env` (`GH_TOKEN`, `ANTHROPIC_API_KEY`); run lanes with `docker compose exec runner npm run runner -- ...`, see `runner/README.md` |
 | `web` | `next start` on port 2999 | dashboard at http://localhost:2999, bound to `127.0.0.1` only |
 
-The dashboard has no login, so the port is published on localhost only. To expose it on your LAN,
-change the port mapping in `docker-compose.yml` to `"2999:2999"` and put auth in front first.
+The dashboard has a login, but it is served over plain http, so the port is published on localhost only. To expose it
+beyond localhost, put a TLS proxy in front first (then set `COOKIE_SECURE=true`), and only then change the port mapping.
 
 `web` never receives the runner's `GH_TOKEN` (it can write) or `ANTHROPIC_API_KEY`. It reads
 `WEB_GH_TOKEN` from `.env`, which should be a read-only token. Leave it empty to see demo data.
@@ -43,11 +43,16 @@ Windows folder is unreliable. Back up the volume, and keep `MFA_ENCRYPTION_KEY` 
 | --- | --- | --- | --- |
 | `MFA_ENCRYPTION_KEY` | yes | | 32 random bytes, base64. Encrypts MFA secrets at rest. Lose it and every user must re-enroll MFA. Generate: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | no | | First admin, created on first start only when no admin exists. Set both or neither; password 12-128 characters. Remove `ADMIN_PASSWORD` from `.env` afterwards. |
-| `EMAIL_VERIFICATION` | no | `false` | `true` makes `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` and `SMTP_FROM` required. |
+| `EMAIL_VERIFICATION` | no | `false` | Not implemented yet: `true` makes the container refuse to start. Later, `true` makes `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` and `SMTP_FROM` required. |
 | `COOKIE_SECURE` | no | on in production | Set `false` for plain http on localhost. Exposing the dashboard beyond localhost needs a TLS proxy. |
+| `TRUST_PROXY` | no | `false` | `true` when a reverse proxy you control sets `X-Forwarded-For`; enables per-IP login and registration limits. Leave `false` otherwise: the header is spoofable, and logins are then throttled per account only. Only use `true` when the proxy is the sole way in; if port 2999 is also reachable directly, clients can forge the header and dodge the per-IP limits. |
 | `AUTH_DB_PATH` | no | `/auth/auth.db` | Set by compose. |
 
-The login screens themselves arrive in later steps; for now the database is created and migrated.
+Login, registration, the waiting page (for accounts without a role) and password change are live. The first admin
+comes from `ADMIN_EMAIL` and `ADMIN_PASSWORD` and must change its password at first login. Public routes are
+`/login`, `/register` and `/api/health` (the container healthcheck, which answers only `ok` or an error); everything
+else needs a session. Behind a TLS proxy, set `serverActions.allowedOrigins` in `web/next.config.ts` to the public
+host, because Next rejects actions whose `Origin` differs from `Host`.
 
 On Windows Git Bash, prefix with `MSYS_NO_PATHCONV=1` if paths get mangled.
 
