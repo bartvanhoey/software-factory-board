@@ -10,16 +10,27 @@ describe("ProjectSchema", () => {
     expect(p.defaultBranch).toBe("main");
     expect(p.enabled).toBe(true);
     expect(p.lanes).toEqual({ build: true, qa: true, review: true });
-    expect(p.limits).toEqual({ maxTurns: 20, qaMaxTurns: 20, reviewMaxTurns: 20 });
+    expect(p.limits).toEqual({ maxTurns: 20, qaMaxTurns: 20, reviewMaxTurns: 20, maxReworks: 2 });
   });
 
   it("lets a project set the turn caps separately", () => {
     const p = parseProject({ ...base, limits: { maxTurns: 30 } }, file);
-    expect(p.limits).toEqual({ maxTurns: 30, qaMaxTurns: 20, reviewMaxTurns: 20 });
+    expect(p.limits).toEqual({ maxTurns: 30, qaMaxTurns: 20, reviewMaxTurns: 20, maxReworks: 2 });
     expect(parseProject({ ...base, limits: { qaMaxTurns: 5 } }, file).limits.qaMaxTurns).toBe(5);
     expect(parseProject({ ...base, limits: { reviewMaxTurns: 9 } }, file).limits.reviewMaxTurns).toBe(9);
     expect(() => parseProject({ ...base, limits: { qaMaxTurns: 0 } }, file)).toThrow(/qaMaxTurns/);
     expect(() => parseProject({ ...base, limits: { reviewMaxTurns: 0 } }, file)).toThrow(/reviewMaxTurns/);
+  });
+
+  it("lets a project cap the automatic reworks, down to none", () => {
+    expect(parseProject({ ...base, limits: { maxReworks: 5 } }, file).limits.maxReworks).toBe(5);
+    expect(parseProject({ ...base, limits: { maxReworks: 0 } }, file).limits.maxReworks).toBe(0);
+    expect(() => parseProject({ ...base, limits: { maxReworks: -1 } }, file)).toThrow(/maxReworks/);
+    expect(() => parseProject({ ...base, limits: { maxReworks: 1.5 } }, file)).toThrow(/maxReworks/);
+  });
+
+  it("accepts a rework prompt override", () => {
+    expect(parseProject({ ...base, prompts: { rework: "prompts/mine.md" } }, file).prompts.rework).toBe("prompts/mine.md");
   });
 
   it("flags a project without a test command", () => {

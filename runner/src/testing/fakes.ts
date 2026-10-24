@@ -183,8 +183,8 @@ export class FakeGit implements Git {
     this.enter("deleteBranch", branch);
     this.localBranches.delete(branch);
   }
-  async commitsAhead() {
-    this.enter("commitsAhead");
+  async commitsAhead(_cwd: string, base: string) {
+    this.enter("commitsAhead", base);
     return this.ahead;
   }
   async isClean() {

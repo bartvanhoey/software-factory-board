@@ -16,7 +16,8 @@ To add a project, drop in a new file and run `npm run validate`.
 | `limits.maxTurns` | no | `20` | agent turn cap for the build lane |
 | `limits.qaMaxTurns` | no | `20` | agent turn cap for the qa lane |
 | `limits.reviewMaxTurns` | no | `20` | agent turn cap for the review lane |
-| `prompts.builder` / `qa` / `review` | no | | prompt file path, relative to this repo's root |
+| `limits.maxReworks` | no | `2` | how often the build lane reworks a card by itself after qa or review sent it back; `0` turns it off |
+| `prompts.builder` / `qa` / `review` / `rework` | no | | prompt file path, relative to this repo's root |
 
 Unknown keys are rejected. Clone paths are not set here: they come from the
 per-machine `local.json` (see `local.example.json`).

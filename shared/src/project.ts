@@ -30,6 +30,8 @@ export const ProjectSchema = z
         qaMaxTurns: z.number().int().positive().default(20),
         /** Agent turn cap for the review lane. */
         reviewMaxTurns: z.number().int().positive().default(20),
+        /** How many times the build lane reworks a card by itself after qa or review sent it back. 0 turns it off. */
+        maxReworks: z.number().int().min(0).default(2),
       })
       .strict()
       .default({}),
@@ -38,6 +40,7 @@ export const ProjectSchema = z
         builder: z.string().min(1).optional(),
         qa: z.string().min(1).optional(),
         review: z.string().min(1).optional(),
+        rework: z.string().min(1).optional(),
       })
       .strict()
       .default({}),
