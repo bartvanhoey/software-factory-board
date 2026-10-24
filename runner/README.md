@@ -81,7 +81,11 @@ Rework cards are picked before `ready` cards, oldest first. The run:
    with neither command skips them, and the agent decides alone.
 4. Runs a read-only agent (`prompts/qa.md`: Read, Glob, Grep, a few `git` subcommands and the stack's
    toolchain; no Edit or Write) that ends with `VERDICT: PASS` or `FAIL` and up to five `REASON:` lines.
-   The last exact `VERDICT:` line counts, and a failed check always wins over a PASS.
+   The last exact `VERDICT:` line counts, and a failed check always wins over a PASS. Besides the issue, the
+   agent gets what earlier rounds asked for, read from the issue's comments (factory login only, quoted as
+   data): **Requirements added by review** (the latest `[review] changes requested`, live until a
+   `[review] approved` or `merged`), and **Earlier qa findings to re-check** (the latest `[qa] fail`, once a
+   rework answered it). So a rework that did what review asked is not failed for it.
 5. Decides, and comments on the **issue** (`[qa] pass|fail at <sha>`; there is no PR yet):
    - pass: `qa` becomes `review`
    - failed check or FAIL verdict: `qa` becomes `building`
@@ -99,6 +103,8 @@ The last gate before a merge. **Nothing is merged unless you pass `--merge`.**
 3. **Merge gate:** a fresh worktree at the current default branch, the branch head merged in with
    `git merge --no-commit --no-ff`, then the project's build and test on that result.
 4. A read-only agent (`prompts/review.md`, same tools as qa) answers `VERDICT: APPROVE` or `REQUEST_CHANGES`.
+   It gets the same **Requirements added by review** section as qa, so a re-review judges against what the
+   earlier review asked for.
 5. Staleness: if the default branch or the branch head moved while it ran, the result is inconclusive.
 6. Decides, and comments on the **issue**:
    - a conflict, a failed build or test, or `REQUEST_CHANGES`: `review` becomes `building`. **No PR is opened.**
