@@ -1,6 +1,8 @@
 /** Exit codes, kept from scripts/run.sh. */
 export const EXIT = {
   failed: 1,
+  /** The qa lane could not decide; the card stays where it is. */
+  inconclusive: 2,
   usage: 64,
   precondition: 65,
   missingFile: 66,

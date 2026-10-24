@@ -11,6 +11,9 @@ export const EVENT_TYPES = [
   "pr_opened",
   "handed_off",
   "labels_created",
+  "passed",
+  "sent_back",
+  "inconclusive",
   "failed",
 ] as const;
 

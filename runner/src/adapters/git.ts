@@ -24,6 +24,14 @@ export const gitCli: Git = {
     await git(cwd, ["worktree", "add", "-b", branch, path, startPoint]);
   },
 
+  async worktreeAddDetached(cwd, path, sha) {
+    await git(cwd, ["worktree", "add", "--detach", path, sha]);
+  },
+
+  async revParse(cwd, ref) {
+    return (await git(cwd, ["rev-parse", ref])).trim();
+  },
+
   async worktreeRemove(cwd, path) {
     await runProcess("git", ["-C", cwd, "worktree", "remove", "--force", path]);
     await runProcess("git", ["-C", cwd, "worktree", "prune"]);

@@ -10,6 +10,7 @@ export const claudeAgent: AgentRunner = {
       { cwd, input: prompt, logFile, env },
     );
     if (result.code !== 0) throw new Error(`claude exited with code ${result.code}`);
+    return result.stdout;
   },
 };
 

@@ -5,7 +5,7 @@ Do this:
 - For each acceptance criterion, decide met or not met, with file and line evidence.
 - Check for scope creep: files or behavior changed that the issue did not ask for.
 - Check test coverage: does a test cover the change? A trivial one-line fix does not need a new test, but say so.
-- Try to break the change: edge cases, duplicate calls, null input. Run `dotnet build` or `dotnet test` if it helps.
+- Try to break the change: edge cases, duplicate calls, null input. Run the project's build command (`{{build_command}}`) or test command (`{{test_command}}`) if it helps.
 - Fail only for: an unmet acceptance criterion, a regression, an out-of-scope change, or a failing build or test. Do not fail for style preferences.
 - This repo is public. Never include secrets, tokens, env vars or local machine paths in your output.
 

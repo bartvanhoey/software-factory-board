@@ -17,6 +17,9 @@ export function dryRunGh(real: Gh, print: (line: string) => void): Gh {
     async comment(repo: string, number: number, body: string) {
       print(fmt("comment", [repo, number, body]));
     },
+    async commentPr(repo: string, number: number, body: string) {
+      print(fmt("commentPr", [repo, number, body]));
+    },
     async createDraftPr(repo: string, pr: { base: string; head: string; title: string; body: string }) {
       print(fmt("createDraftPr", [repo, pr.base, pr.head, pr.title]));
       return "<pr-url>";
@@ -29,6 +32,9 @@ export function dryRunGit(real: Git, print: (line: string) => void): Git {
   return Object.assign(Object.create(real) as Git, {
     async worktreeAdd(_cwd: string, path: string, branch: string, startPoint: string) {
       print(fmt("worktreeAdd", [path, branch, startPoint]));
+    },
+    async worktreeAddDetached(_cwd: string, path: string, sha: string) {
+      print(fmt("worktreeAddDetached", [path, sha]));
     },
     async worktreeRemove(_cwd: string, path: string) {
       print(fmt("worktreeRemove", [path]));

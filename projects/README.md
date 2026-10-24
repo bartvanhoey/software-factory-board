@@ -13,7 +13,8 @@ To add a project, drop in a new file and run `npm run validate`.
 | `commands.build` | no | | run when no `test` command exists |
 | `commands.test` | no | | omit for projects without tests |
 | `lanes.build` / `qa` / `review` | no | `true` | disable a lane per project |
-| `limits.maxTurns` | no | `20` | agent turn cap |
+| `limits.maxTurns` | no | `20` | agent turn cap for the build lane |
+| `limits.qaMaxTurns` | no | `20` | agent turn cap for the qa lane |
 | `prompts.builder` / `qa` / `review` | no | | prompt file path, relative to this repo's root |
 
 Unknown keys are rejected. Clone paths are not set here: they come from the

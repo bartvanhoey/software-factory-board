@@ -7,12 +7,15 @@ export type CallLog = string[];
 export class FakeGh implements Gh {
   labels = new Set<string>();
   issues = new Map<number, IssueData>();
+  /** Open pull requests by head branch. */
+  openPrs = new Map<string, { number: number; url: string }>();
   me = { login: "factory-bot", id: 42 };
   prUrl = "https://github.com/o/r/pull/7";
   /** method name -> error to throw on its next call. */
   failOnce = new Map<string, Error>();
   edits: { number: number; edit: IssueEdit }[] = [];
   comments: { number: number; body: string }[] = [];
+  prComments: { number: number; body: string }[] = [];
   prs: { base: string; head: string; title: string; body: string }[] = [];
   createdLabels: LabelSpec[] = [];
 
@@ -68,6 +71,14 @@ export class FakeGh implements Gh {
     this.enter("comment", String(number));
     this.comments.push({ number, body });
   }
+  async findOpenPr(_repo: string, branch: string) {
+    this.enter("findOpenPr", branch);
+    return this.openPrs.get(branch) ?? null;
+  }
+  async commentPr(_repo: string, number: number, body: string) {
+    this.enter("commentPr", String(number));
+    this.prComments.push({ number, body });
+  }
   async createDraftPr(_repo: string, pr: { base: string; head: string; title: string; body: string }) {
     this.enter("createDraftPr", pr.head);
     this.prs.push(pr);
@@ -84,6 +95,9 @@ export class FakeGit implements Git {
   ahead = 1;
   clean = true;
   origin = "https://github.com/o/r.git";
+  /** What `rev-parse` returns, call by call; the last value repeats. */
+  shas: string[] = ["a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0"];
+  detachedAdds: { path: string; sha: string }[] = [];
   failOnce = new Map<string, Error>();
 
   constructor(private readonly log: CallLog = []) {}
@@ -107,6 +121,15 @@ export class FakeGit implements Git {
   async worktreeAdd(_cwd: string, _path: string, branch: string, startPoint: string) {
     this.enter("worktreeAdd", `${branch} from ${startPoint}`);
     this.localBranches.add(branch);
+  }
+  async worktreeAddDetached(_cwd: string, path: string, sha: string) {
+    this.enter("worktreeAddDetached", sha.slice(0, 7));
+    this.detachedAdds.push({ path, sha });
+  }
+  async revParse(_cwd: string, ref: string) {
+    this.enter("revParse", ref);
+    const sha = this.shas.length > 1 ? this.shas.shift() : this.shas[0];
+    return sha as string;
   }
   async worktreeRemove() {
     this.enter("worktreeRemove");
@@ -139,6 +162,8 @@ export class FakeGit implements Git {
 export class FakeAgent implements AgentRunner {
   runs: AgentRun[] = [];
   error: Error | null = null;
+  /** The text the agent answers with. */
+  output = "";
 
   constructor(private readonly log: CallLog = []) {}
 
@@ -146,19 +171,22 @@ export class FakeAgent implements AgentRunner {
     this.log.push("agent.run");
     this.runs.push(run);
     if (this.error) throw this.error;
+    return this.output;
   }
 }
 
 export class FakeShell implements Shell {
   commands: { command: string; cwd: string }[] = [];
   ok = true;
+  /** Commands that fail even when `ok` is true. */
+  failing = new Set<string>();
 
   constructor(private readonly log: CallLog = []) {}
 
   async run(command: string, opts: { cwd: string }) {
     this.log.push(`shell.run ${command}`);
     this.commands.push({ command, cwd: opts.cwd });
-    return { ok: this.ok };
+    return { ok: this.ok && !this.failing.has(command) };
   }
 }
 
