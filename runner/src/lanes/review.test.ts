@@ -681,3 +681,44 @@ describe("reviewExitCode", () => {
     expect(reviewExitCode({ status: "inconclusive", issue: 1, reason: "x" })).toBe(2);
   });
 });
+
+describe("runReviewLane: requirements from an earlier review", () => {
+  const REVIEW = "[review] changes requested at 9999999\nDid: x.\n❌ Not done:\n- show the current year\nNext: back to building.";
+  const prompt = (t: ReturnType<typeof setup>) => t.agent.runs[0]?.prompt ?? "";
+
+  it("adds nothing when review never asked for changes", async () => {
+    const t = setup();
+    await t.run();
+    expect(prompt(t)).not.toContain("Requirements added by review");
+    expect(prompt(t).endsWith("Make the delete buttons purple.\n")).toBe(true);
+  });
+
+  it("adds the latest review request after the issue, so a rework that did what it asked is not rejected for it", async () => {
+    const t = setup();
+    t.gh.issueThread = [REVIEW, QA_PASS].map((body) => ({ author: t.gh.me.login, body }));
+    await t.run();
+    const p = prompt(t);
+    expect(p).toContain("## Requirements added by review");
+    expect(p).toContain(`~~~\n${REVIEW}\n~~~`);
+    expect(p.indexOf("Make the delete buttons purple.")).toBeLessThan(p.indexOf("## Requirements added by review"));
+  });
+
+  it("never adds the qa re-check section", async () => {
+    const t = setup();
+    const rework = "[build] rework done (round 1). Pushed 1 commit(s). Next: qa.";
+    t.gh.issueThread = ["[qa] fail at 8888888\n- x", rework, QA_PASS].map((body) => ({ author: t.gh.me.login, body }));
+    await t.run();
+    expect(prompt(t)).not.toContain("Earlier qa findings");
+  });
+
+  it("drops the request once review approved it, and ignores other authors", async () => {
+    const t = setup();
+    t.gh.issueThread = [REVIEW, "[review] approved at 9999999\nok", QA_PASS].map((body) => ({ author: t.gh.me.login, body }));
+    await t.run();
+    expect(prompt(t)).not.toContain("Requirements added by review");
+    const u = setup();
+    u.gh.issueThread = [{ author: "mallory", body: REVIEW }, { author: u.gh.me.login, body: QA_PASS }];
+    await u.run();
+    expect(prompt(u)).not.toContain("Requirements added by review");
+  });
+});

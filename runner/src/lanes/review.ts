@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import type { NewEvent, Project } from "@factory/shared";
 import { EXIT, UsageError, errorMessage } from "../errors.js";
+import { laneContext, laneSections } from "../feedback.js";
 import { compareUrl } from "../links.js";
 import type { AgentRunner, EventLog, Gh, Git, LabelEnsurer, Shell } from "../ports.js";
 import { qaToolsFor, renderPrompt } from "../prompt.js";
@@ -138,7 +139,8 @@ export async function runReviewLane(deps: ReviewDeps, opts: ReviewOptions): Prom
 
   // 2. The branch must be what the qa lane passed, judged by the factory's own account.
   const me = await gh.whoami();
-  const qa = latestQaResult(await gh.listIssueComments(repo, number), me.login);
+  const thread = await gh.listIssueComments(repo, number);
+  const qa = latestQaResult(thread, me.login);
   const toQa = async (why: string): Promise<ReviewResult> => {
     say(`back to qa: ${why}`);
     await gh.editIssue(repo, number, { removeLabels: ["review"], addLabels: ["qa"] });
@@ -211,7 +213,7 @@ export async function runReviewLane(deps: ReviewDeps, opts: ReviewOptions): Prom
     const did = checks.length > 0 ? `merge gate (${base} + branch), agent review` : `agent review (no build or test command configured)`;
 
     // 5. Agent review, read-only.
-    const prompt = `${rendered}\n\nCommit under review: ${sha}\nBase: origin/${base}\n\n## Issue #${number}: ${issue.title}\n\n${issue.body}\n`;
+    const prompt = `${rendered}\n\nCommit under review: ${sha}\nBase: origin/${base}\n\n## Issue #${number}: ${issue.title}\n\n${issue.body}\n${laneSections(laneContext(thread, me.login), { recheck: false })}`;
     say(`review agent running; its answer goes to ${agentFile}`);
     let answer: string;
     try {

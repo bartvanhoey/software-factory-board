@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import type { NewEvent, Project } from "@factory/shared";
 import { EXIT, UsageError, errorMessage } from "../errors.js";
+import { laneContext, laneSections } from "../feedback.js";
 import { compareUrl } from "../links.js";
 import type { AgentRunner, Gh, Git, LabelEnsurer, Shell, EventLog } from "../ports.js";
 import { qaToolsFor, renderPrompt } from "../prompt.js";
@@ -87,7 +88,7 @@ export async function runQaLane(deps: QaDeps, opts: QaOptions): Promise<QaResult
     throw new UsageError(`issue #${number} is not labelled qa`, EXIT.precondition);
   }
   const branch = `issue-${number}`;
-  const prompt = `${renderPrompt(opts.promptTemplate, project)}\n\n## Issue #${number}: ${issue.title}\n\n${issue.body}\n`;
+  const rendered = renderPrompt(opts.promptTemplate, project);
   // The work is a branch: no PR exists until the review lane approves it.
   if (!(await git.remoteBranchExists(cloneDir, branch))) {
     throw new UsageError(`branch ${branch} not found on origin`, EXIT.precondition);
@@ -138,6 +139,17 @@ export async function runQaLane(deps: QaDeps, opts: QaOptions): Promise<QaResult
     reasons.length > 0 ? reasons.map((r) => `- ${r}`).join("\n") : "- (the agent gave no reason)";
 
   try {
+    // The issue text, plus what earlier review and qa rounds asked for: a rework that did what review
+    // asked must not fail for it.
+    let prompt: string;
+    try {
+      const me = await gh.whoami();
+      const context = laneContext(await gh.listIssueComments(repo, number), me.login);
+      prompt = `${rendered}\n\n## Issue #${number}: ${issue.title}\n\n${issue.body}\n${laneSections(context, { recheck: true })}`;
+    } catch (e) {
+      return await inconclusive(`could not read the issue's comments (${errorMessage(e)})`);
+    }
+
     // 3. Isolate: a fresh detached worktree at exactly the commit under test.
     await git.worktreeRemove(cloneDir, worktree);
     await git.worktreeAddDetached(cloneDir, worktree, sha);
