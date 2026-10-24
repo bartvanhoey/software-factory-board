@@ -9,6 +9,7 @@ const gh = (args: string[], input?: string): Promise<string> => mustRun("gh", ar
 const UserSchema = z.object({ login: z.string(), id: z.number() });
 const NamesSchema = z.array(z.object({ name: z.string() }));
 const NumbersSchema = z.array(z.object({ number: z.number() }));
+const PrsSchema = z.array(z.object({ number: z.number(), url: z.string() }));
 const IssueSchema = z.object({
   number: z.number(),
   title: z.string(),
@@ -59,6 +60,15 @@ export const ghCli: Gh = {
 
   async comment(repo, number, body) {
     await gh(["issue", "comment", String(number), "-R", repo, "--body-file", "-"], body);
+  },
+
+  async findOpenPr(repo, branch) {
+    const out = await gh(["pr", "list", "-R", repo, "--head", branch, "--state", "open", "--json", "number,url"]);
+    return PrsSchema.parse(JSON.parse(out))[0] ?? null;
+  },
+
+  async commentPr(repo, number, body) {
+    await gh(["pr", "comment", String(number), "-R", repo, "--body-file", "-"], body);
   },
 
   async createDraftPr(repo, pr) {

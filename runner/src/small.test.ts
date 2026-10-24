@@ -9,7 +9,7 @@ import { UsageError } from "./errors.js";
 import { createEventLog } from "./events.js";
 import { acquireLock } from "./lock.js";
 import { findOnPath, missingTools, programOf } from "./preflight.js";
-import { allowedToolsFor, renderPrompt, verifyStep } from "./prompt.js";
+import { allowedToolsFor, qaToolsFor, renderPrompt, verifyStep } from "./prompt.js";
 import { FakeGh, FakeGit } from "./testing/fakes.js";
 
 let tmp: string;
@@ -26,6 +26,12 @@ describe("parseArgs", () => {
     expect(parseArgs(["build", "--project", "demo"])).toEqual({ command: "build", project: "demo", issue: undefined, dryRun: false });
     expect(parseArgs(["build", "--project", "demo", "--issue", "12", "--dry-run"])).toMatchObject({ issue: 12, dryRun: true });
     expect(parseArgs(["labels", "--project", "demo"]).command).toBe("labels");
+  });
+
+  it("parses qa, with an optional issue and dry run", () => {
+    expect(parseArgs(["qa", "--project", "demo"])).toEqual({ command: "qa", project: "demo", issue: undefined, dryRun: false });
+    expect(parseArgs(["qa", "--project", "demo", "--issue", "53", "--dry-run"])).toMatchObject({ command: "qa", issue: 53, dryRun: true });
+    expect(() => parseArgs(["qa"])).toThrow(UsageError);
   });
 
   it("rejects bad input with a usage error", () => {
@@ -53,6 +59,15 @@ describe("renderPrompt / allowedToolsFor / verifyStep", () => {
     expect(allowedToolsFor(project({ stack: "other" })).some((t) => t.startsWith("Bash(") && !t.startsWith("Bash(git "))).toBe(false);
     for (const stack of ["dotnet", "node", "python", "other"] as const) {
       expect(allowedToolsFor(project({ stack }))).not.toContain("Bash");
+    }
+  });
+
+  it("gives the qa agent the same toolchain but no way to write or commit", () => {
+    const tools = qaToolsFor(project({ stack: "dotnet" }));
+    expect(tools).toEqual(expect.arrayContaining(["Read", "Glob", "Grep", "Bash(git diff:*)", "Bash(dotnet:*)"]));
+    for (const stack of ["dotnet", "node", "python", "other"] as const) {
+      const t = qaToolsFor(project({ stack }));
+      for (const forbidden of ["Edit", "Write", "Bash", "Bash(git add:*)", "Bash(git commit:*)"]) expect(t, `${stack} ${forbidden}`).not.toContain(forbidden);
     }
   });
 

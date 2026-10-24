@@ -9,6 +9,12 @@ describe("EventSchema", () => {
     expect(EventSchema.parse({ ...ok, issue: 4, url: "https://github.com/o/r/pull/1" }).issue).toBe(4);
   });
 
+  it("accepts the qa lane and its event types", () => {
+    for (const type of ["passed", "sent_back", "inconclusive"]) {
+      expect(EventSchema.safeParse({ ...ok, lane: "qa", type }).success, type).toBe(true);
+    }
+  });
+
   it("rejects unknown lanes, types, keys and bad timestamps", () => {
     expect(EventSchema.safeParse({ ...ok, lane: "deploy" }).success).toBe(false);
     expect(EventSchema.safeParse({ ...ok, type: "exploded" }).success).toBe(false);

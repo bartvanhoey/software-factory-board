@@ -41,6 +41,13 @@ export function allowedToolsFor(project: Project): string[] {
   return [...BASE_TOOLS, ...STACK_TOOLS[project.stack]];
 }
 
+const QA_BASE_TOOLS = ["Read", "Glob", "Grep", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git status:*)"];
+
+/** Tools the qa agent may use. It reviews and may run the stack's toolchain, but has no Edit or Write. */
+export function qaToolsFor(project: Project): string[] {
+  return [...QA_BASE_TOOLS, ...STACK_TOOLS[project.stack]];
+}
+
 /** What the lane runs to check the branch independently of the agent: tests, else a build, else nothing. */
 export function verifyStep(project: Project): { kind: "test" | "build"; command: string } | null {
   if (project.commands.test) return { kind: "test", command: project.commands.test };

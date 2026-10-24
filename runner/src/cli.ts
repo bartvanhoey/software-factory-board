@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { loadProjects, type Project } from "@factory/shared";
 import { claudeAgent, shellRunner } from "./adapters/claude.js";
 import { ghCli } from "./adapters/gh.js";
@@ -10,6 +11,7 @@ import {
   lockDirFor,
   logDirFor,
   promptPath,
+  qaPromptPath,
   resolveCloneDir,
   worktreeRoot,
 } from "./config.js";
@@ -18,6 +20,7 @@ import { EXIT, UsageError } from "./errors.js";
 import { createEventLog } from "./events.js";
 import { createLabelEnsurer, ensureLabels } from "./labels.js";
 import { runBuildLane } from "./lanes/build.js";
+import { qaExitCode, runQaLane } from "./lanes/qa.js";
 import { acquireLock } from "./lock.js";
 import { missingTools, programOf } from "./preflight.js";
 import type { EventLog } from "./ports.js";
@@ -26,13 +29,17 @@ import { verifyStep } from "./prompt.js";
 
 const USAGE = `usage:
   runner build  --project <name> [--issue <number>] [--dry-run]
+  runner qa     --project <name> [--issue <number>] [--dry-run]
   runner labels --project <name> [--dry-run]
 
   build   run the build lane once: take one ready issue to a draft PR and the qa label
-  labels  create the missing ready/building/qa/review labels in the project's repo`;
+  qa      run the qa lane once: test the PR of one qa card, then move it to review or back to building
+  labels  create the missing ready/building/qa/review labels in the project's repo
+
+  exit codes: 0 ok, 1 failed or sent back, 2 qa inconclusive, 64 usage, 65 precondition, 69 missing tool, 75 locked`;
 
 export interface Args {
-  command: "build" | "labels";
+  command: "build" | "qa" | "labels";
   project: string;
   issue?: number;
   dryRun: boolean;
@@ -40,7 +47,7 @@ export interface Args {
 
 export function parseArgs(argv: readonly string[]): Args {
   const [command, ...rest] = argv;
-  if (command !== "build" && command !== "labels") throw new UsageError(USAGE);
+  if (command !== "build" && command !== "qa" && command !== "labels") throw new UsageError(USAGE);
   let project: string | undefined;
   let issue: number | undefined;
   let dryRun = false;
@@ -55,11 +62,16 @@ export function parseArgs(argv: readonly string[]): Args {
     } else throw new UsageError(`unknown argument "${arg}"\n${USAGE}`);
   }
   if (!project) throw new UsageError(`--project is required\n${USAGE}`);
-  if (issue !== undefined && command !== "build") throw new UsageError("--issue only applies to build");
+  if (issue !== undefined && command === "labels") throw new UsageError("--issue only applies to build and qa");
   return { command, project, issue, dryRun };
 }
 
 const say = (message: string): void => console.log(`==> ${message}`);
+
+function writeText(file: string, text: string): void {
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, text);
+}
 
 async function requireTools(tools: string[]): Promise<void> {
   const missing = missingTools(tools);
@@ -89,12 +101,22 @@ export async function main(argv: readonly string[]): Promise<number> {
     say(`the build lane is disabled for ${project.name}`);
     return 0;
   }
+  if (args.command === "qa" && !project.lanes.qa) {
+    say(`the qa lane is disabled for ${project.name}`);
+    return 0;
+  }
 
   const tools = ["git", "gh"];
   if (args.command === "build") {
     tools.push("claude");
     const verify = verifyStep(project);
     if (verify) tools.push(programOf(verify.command));
+  }
+  if (args.command === "qa") {
+    tools.push("claude");
+    for (const command of [project.commands.build, project.commands.test]) {
+      if (command) tools.push(programOf(command));
+    }
   }
   await requireTools(tools);
 
@@ -120,15 +142,24 @@ export async function main(argv: readonly string[]): Promise<number> {
       return 0;
     }
 
-    const file = promptPath(project);
+    const file = args.command === "qa" ? qaPromptPath(project) : promptPath(project);
     if (!existsSync(file)) throw new UsageError(`missing file: ${file}`, EXIT.missingFile);
+    const paths = { worktreeRoot: worktreeRoot(project, settings, cloneDir), logDir: logDirFor(settings, project) };
+
+    if (args.command === "qa") {
+      const result = await runQaLane(
+        { gh, git, agent: claudeAgent, shell: shellRunner, events, labels, say, writeText },
+        { project, cloneDir, paths, promptTemplate: readFileSync(file, "utf8"), issue: args.issue, dryRun: args.dryRun },
+      );
+      return qaExitCode(result);
+    }
 
     const result = await runBuildLane(
       { gh, git, agent: claudeAgent, shell: shellRunner, events, labels, say },
       {
         project,
         cloneDir,
-        paths: { worktreeRoot: worktreeRoot(project, settings, cloneDir), logDir: logDirFor(settings, project) },
+        paths,
         promptTemplate: readFileSync(file, "utf8"),
         issue: args.issue,
         dryRun: args.dryRun,

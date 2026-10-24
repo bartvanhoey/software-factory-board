@@ -29,6 +29,9 @@ export interface Gh {
   getIssue(repo: string, number: number): Promise<IssueData>;
   editIssue(repo: string, number: number, edit: IssueEdit): Promise<void>;
   comment(repo: string, number: number, body: string): Promise<void>;
+  /** The open pull request whose head is `branch`, or null. */
+  findOpenPr(repo: string, branch: string): Promise<{ number: number; url: string } | null>;
+  commentPr(repo: string, number: number, body: string): Promise<void>;
   /** Returns the URL of the new pull request. */
   createDraftPr(repo: string, pr: { base: string; head: string; title: string; body: string }): Promise<string>;
   cloneRepo(repo: string, dir: string): Promise<void>;
@@ -38,6 +41,9 @@ export interface Git {
   originUrl(cwd: string): Promise<string>;
   fetch(cwd: string, remote: string, branch: string): Promise<void>;
   worktreeAdd(cwd: string, path: string, branch: string, startPoint: string): Promise<void>;
+  /** A worktree at one exact commit, on no branch. */
+  worktreeAddDetached(cwd: string, path: string, sha: string): Promise<void>;
+  revParse(cwd: string, ref: string): Promise<string>;
   /** Removes a worktree if it exists; never throws for a missing one. */
   worktreeRemove(cwd: string, path: string): Promise<void>;
   branchExists(cwd: string, branch: string): Promise<boolean>;
@@ -58,9 +64,9 @@ export interface AgentRun {
   env: Record<string, string>;
 }
 
-/** The coding agent (`claude -p`). Rejects when it exits with an error. */
+/** The coding agent (`claude -p`). Resolves with its final text; rejects when it exits with an error. */
 export interface AgentRunner {
-  run(run: AgentRun): Promise<void>;
+  run(run: AgentRun): Promise<string>;
 }
 
 /** Runs a project command (build or test) through a shell. */

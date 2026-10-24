@@ -22,7 +22,15 @@ export const ProjectSchema = z
       })
       .strict()
       .default({}),
-    limits: z.object({ maxTurns: z.number().int().positive().default(20) }).strict().default({}),
+    limits: z
+      .object({
+        /** Agent turn cap for the build lane. */
+        maxTurns: z.number().int().positive().default(20),
+        /** Agent turn cap for the qa lane. */
+        qaMaxTurns: z.number().int().positive().default(20),
+      })
+      .strict()
+      .default({}),
     prompts: z
       .object({
         builder: z.string().min(1).optional(),
