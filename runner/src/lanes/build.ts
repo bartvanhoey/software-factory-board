@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import type { Project } from "@factory/shared";
 import { UsageError, EXIT, errorMessage } from "../errors.js";
+import { compareUrl } from "../links.js";
 import { allowedToolsFor, renderPrompt, verifyStep } from "../prompt.js";
 import type { AgentRunner, EventLog, Gh, Git, LabelEnsurer, Shell } from "../ports.js";
 
@@ -28,7 +29,7 @@ export interface BuildOptions {
 
 export type BuildResult =
   | { status: "noop" }
-  | { status: "done"; issue: number; prUrl: string }
+  | { status: "done"; issue: number; branch: string; compareUrl: string }
   | { status: "failed"; issue?: number; reason: string };
 
 const hasLabel = (labels: readonly string[], name: string): boolean =>
@@ -36,7 +37,8 @@ const hasLabel = (labels: readonly string[], name: string): boolean =>
 
 /**
  * The build lane: claim one `ready` issue, build it in an isolated worktree with the agent,
- * verify the result independently, open a draft PR and move the card to `qa`.
+ * verify the result independently, push the branch and move the card to `qa`. It opens no PR:
+ * a PR means "approved", and only the review lane opens one.
  * On a failure after the claim the card stays in `building` with a comment on the issue.
  */
 export async function runBuildLane(deps: BuildDeps, opts: BuildOptions): Promise<BuildResult> {
@@ -185,27 +187,22 @@ export async function runBuildLane(deps: BuildDeps, opts: BuildOptions): Promise
         ? `Independent \`${verify.command}\`: passed.`
         : `No tests configured. Independent build \`${verify.command}\`: passed.`
       : "Tests: none configured.";
-    say(`push ${branch} and open draft PR`);
-    let prUrl: string;
+    // Only the branch is pushed. The review lane opens the PR after an approval.
+    say(`push ${branch}`);
+    const compare = compareUrl(repo, project.defaultBranch, branch);
     try {
       await git.push(worktree, branch);
-      prUrl = await gh.createDraftPr(repo, {
-        base: project.defaultBranch,
-        head: branch,
-        title: issue.title,
-        body: `Closes #${number}\n\nBuilt by the build lane (runner).\n${verifyLine}`,
-      });
     } catch (e) {
-      return await fail(`could not push or open the pull request (${errorMessage(e)})`);
+      return await fail(`could not push the branch (${errorMessage(e)})`);
     }
-    emit("pr_opened", `draft PR ${prUrl}`, { issue: number, url: prUrl });
+    emit("pushed", `pushed ${branch}`, { issue: number, url: compare });
 
     say("building -> qa");
     await gh.editIssue(repo, number, { removeLabels: ["building"], addLabels: ["qa"] });
-    await gh.comment(repo, number, `[build] done. Draft PR: ${prUrl}. ${verifyLine} Next: qa.`);
-    emit("handed_off", "building -> qa", { issue: number, url: prUrl });
-    say(`done: ${prUrl}`);
-    return { status: "done", issue: number, prUrl };
+    await gh.comment(repo, number, `[build] done. Branch ${branch} pushed (compare: ${compare}). ${verifyLine} Next: qa.`);
+    emit("handed_off", "building -> qa", { issue: number, url: compare });
+    say(`done: ${compare}`);
+    return { status: "done", issue: number, branch, compareUrl: compare };
   } catch (e) {
     return await fail(`unexpected error: ${errorMessage(e)}`);
   } finally {

@@ -7,6 +7,13 @@ import { mustRun, runProcess } from "../process.js";
  */
 const AUTH = ["-c", "credential.helper=", "-c", "credential.helper=!gh auth git-credential"];
 
+const MERGE_IDENTITY = {
+  GIT_AUTHOR_NAME: "factory-runner",
+  GIT_AUTHOR_EMAIL: "factory-runner@localhost",
+  GIT_COMMITTER_NAME: "factory-runner",
+  GIT_COMMITTER_EMAIL: "factory-runner@localhost",
+};
+
 const git = (cwd: string, args: string[], network = false): Promise<string> =>
   mustRun("git", ["-C", cwd, ...(network ? AUTH : []), ...args], { env: { GIT_TERMINAL_PROMPT: "0" } });
 
@@ -30,6 +37,25 @@ export const gitCli: Git = {
 
   async revParse(cwd, ref) {
     return (await git(cwd, ["rev-parse", ref])).trim();
+  },
+
+  async merge(cwd, sha) {
+    // `--no-commit` creates no commit, but git still refuses to start a merge without an identity,
+    // and the container has none. This one that never lands in history satisfies it.
+    const r = await runProcess("git", ["-C", cwd, "merge", "--no-commit", "--no-ff", sha], { env: { ...MERGE_IDENTITY, GIT_TERMINAL_PROMPT: "0" } });
+    if (r.code === 0) return true;
+    // Exit 1 also means "not something we can merge" (a bad commit). Only a real conflict leaves a
+    // merge in progress, which shows as MERGE_HEAD.
+    if (r.code === 1) {
+      const inProgress = await runProcess("git", ["-C", cwd, "rev-parse", "-q", "--verify", "MERGE_HEAD"]);
+      if (inProgress.code === 0) return false;
+    }
+    const detail = (r.stderr || r.stdout).trim().split("\n").slice(-2).join(" | ");
+    throw new Error(`git merge failed (exit ${r.code}): ${detail}`);
+  },
+
+  async deleteRemoteBranch(cwd, branch) {
+    await git(cwd, ["push", "origin", "--delete", branch], true);
   },
 
   async worktreeRemove(cwd, path) {

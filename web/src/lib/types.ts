@@ -17,6 +17,13 @@ export interface BoardPr {
   checks: ChecksState;
 }
 
+/** The branch the factory pushed for an issue, shown while no PR exists yet. */
+export interface BoardBranch {
+  name: string;
+  /** GitHub's compare page against the project's default branch. */
+  compareUrl: string;
+}
+
 export interface BoardIssue {
   project: string;
   number: number;
@@ -28,12 +35,15 @@ export interface BoardIssue {
   assignee: string | null;
   updatedAt: string;
   pr: BoardPr | null;
+  /** Set for qa and review cards without a PR: the factory opens the PR only after the review approves. */
+  branch: BoardBranch | null;
 }
 
 /** What the board needs to know about a project, whichever way it was loaded. */
 export interface ProjectInfo {
   name: string;
   repo: string;
+  defaultBranch: string;
   stack: string;
   hasTests: boolean;
   enabled: boolean;

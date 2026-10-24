@@ -51,6 +51,16 @@ describe("parseVerdict", () => {
     expect(parseVerdict(`REASON: ${"x".repeat(400)}\nVERDICT: PASS`).reasons[0]).toHaveLength(300);
   });
 
+  it("reads other verdict words when asked, and ignores the default ones then", () => {
+    const words = ["APPROVE", "REQUEST_CHANGES"] as const;
+    expect(parseVerdict("REASON: fine\nVERDICT: APPROVE", words)).toEqual({ verdict: "APPROVE", reasons: ["fine"] });
+    expect(parseVerdict("VERDICT: REQUEST_CHANGES", words).verdict).toBe("REQUEST_CHANGES");
+    expect(parseVerdict("VERDICT: PASS", words).verdict).toBeNull();
+    expect(parseVerdict("VERDICT: APPROVE", ["PASS", "FAIL"]).verdict).toBeNull();
+    expect(parseVerdict("VERDICT: APPROVED\nVERDICT: approve\nVERDICT: REQUEST_CHANGES.", words).verdict).toBeNull();
+    expect(parseVerdict("VERDICT: REQUEST_CHANGES\nVERDICT: APPROVE", words).verdict).toBe("APPROVE");
+  });
+
   it("ignores REASON text that is not at the start of a line", () => {
     expect(parseVerdict("note REASON: nope\nVERDICT: PASS").reasons).toEqual([]);
   });

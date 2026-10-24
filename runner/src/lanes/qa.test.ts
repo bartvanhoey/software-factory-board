@@ -36,7 +36,7 @@ function setup(project = makeProject()) {
   const labels = createLabelEnsurer(gh, events, project.name);
   gh.labels = new Set(["ready", "building", "qa", "review"]);
   gh.addIssue(4, ["qa"], { title: "Purple buttons", body: "Make the delete buttons purple." });
-  gh.openPrs.set("issue-4", { number: 12, url: "https://github.com/o/r/pull/12" });
+  git.remoteBranches.add("issue-4");
   agent.output = PASS;
 
   const deps = (): QaDeps => ({
@@ -71,17 +71,17 @@ const inOrder = (log: string[], ...steps: string[]) => {
 };
 
 describe("runQaLane: pass", () => {
-  it("tests the PR's commit in a fresh worktree and moves the card to review", async () => {
+  it("tests the branch's commit in a fresh worktree and moves the card to review", async () => {
     const t = setup();
     const result = await t.run();
 
-    expect(result).toEqual({ status: "passed", issue: 4, pr: 12 });
+    expect(result).toEqual({ status: "passed", issue: 4 });
     inOrder(
       t.log,
       "gh.listLabels",
       "gh.listIssuesByLabel qa",
       "gh.getIssue 4",
-      "gh.findOpenPr issue-4",
+      "git.remoteBranchExists issue-4",
       "git.fetch issue-4",
       "git.revParse origin/issue-4",
       "git.worktreeRemove",
@@ -92,24 +92,25 @@ describe("runQaLane: pass", () => {
       "git.fetch issue-4",
       "git.revParse origin/issue-4",
       "gh.editIssue 4 +[review] -[qa]",
-      "gh.commentPr 12",
+      "gh.comment 4",
       "git.worktreeRemove",
     );
     expect(t.gh.issues.get(4)?.labels).toEqual(["review"]);
     expect(t.git.detachedAdds[0]?.path).toBe(join(WORKTREES, "qa-issue-4"));
     expect(t.events.events.every((e) => e.lane === "qa")).toBe(true);
     expect(t.events.types).toEqual(["started", "verified", "passed"]);
+    expect(t.gh.prs).toEqual([]); // qa never opens a PR
+    expect(t.log.some((l) => l.startsWith("gh.createPr") || l.startsWith("gh.findOpenPr"))).toBe(false);
   });
 
-  it("comments on the PR in the qa.sh format", async () => {
+  it("comments on the issue in the qa.sh format", async () => {
     const t = setup();
     await t.run();
-    expect(t.gh.prComments).toHaveLength(1);
-    expect(t.gh.prComments[0]?.number).toBe(12);
-    expect(t.gh.prComments[0]?.body).toBe(
+    expect(t.gh.comments).toHaveLength(1);
+    expect(t.gh.comments[0]?.number).toBe(4);
+    expect(t.gh.comments[0]?.body).toBe(
       "[qa] pass at a1b2c3d\nDid: build, test, agent review.\n✅ Done:\n- criterion met (site.css:3)\nNext: review.",
     );
-    expect(t.gh.comments).toEqual([]); // the comment goes on the PR, not on the issue
   });
 
   it("runs the agent read-only in the worktree, with the rendered prompt and the qa turn cap", async () => {
@@ -138,13 +139,13 @@ describe("runQaLane: pass", () => {
   it("takes the lowest-numbered qa card, or the one asked for", async () => {
     const t = setup();
     t.gh.addIssue(9, ["qa"]);
-    t.gh.openPrs.set("issue-9", { number: 30, url: "u" });
+    t.git.remoteBranches.add("issue-9");
     await t.run();
     expect(t.gh.edits[0]?.number).toBe(4);
 
     const u = setup();
     u.gh.addIssue(9, ["qa"]);
-    u.gh.openPrs.set("issue-9", { number: 30, url: "u" });
+    u.git.remoteBranches.add("issue-9");
     expect((await u.run({ issue: 9 })).status).toBe("passed");
     expect(u.gh.edits[0]?.number).toBe(9);
     expect(u.log.some((l) => l.startsWith("gh.listIssuesByLabel"))).toBe(false);
@@ -154,20 +155,21 @@ describe("runQaLane: pass", () => {
     const t = setup();
     t.agent.output = [1, 2, 3, 4, 5, 6, 7].map((n) => `REASON: r${n}`).join("\n") + "\nVERDICT: PASS";
     await t.run();
-    const bullets = (t.gh.prComments[0]?.body ?? "").split("\n").filter((l) => l.startsWith("- "));
+    const bullets = (t.gh.comments[0]?.body ?? "").split("\n").filter((l) => l.startsWith("- "));
     expect(bullets).toEqual(["- r1", "- r2", "- r3", "- r4", "- r5"]);
   });
 });
 
 describe("runQaLane: sent back to building", () => {
-  it("on a FAIL verdict, with the reasons on the PR", async () => {
+  it("on a FAIL verdict, with the reasons on the issue, and no PR", async () => {
     const t = setup();
     t.agent.output = FAIL;
     const result = await t.run();
 
-    expect(result).toMatchObject({ status: "sent_back", issue: 4, pr: 12 });
+    expect(result).toMatchObject({ status: "sent_back", issue: 4 });
+    expect(t.gh.prs).toEqual([]);
     expect(t.gh.issues.get(4)?.labels).toEqual(["building"]);
-    expect(t.gh.prComments[0]?.body).toBe(
+    expect(t.gh.comments[0]?.body).toBe(
       "[qa] fail at a1b2c3d\nDid: build, test, agent review.\n❌ Not done:\n" +
         "- delete button on the edit page is still red (EditEmployee.razor:12)\nNext: back to building.",
     );
@@ -183,7 +185,7 @@ describe("runQaLane: sent back to building", () => {
     expect(t.shell.commands.map((c) => c.command)).toEqual(["dotnet build x.sln"]);
     expect(t.agent.runs).toHaveLength(1); // the agent still reviews, as in qa.sh
     expect(t.gh.issues.get(4)?.labels).toEqual(["building"]);
-    expect(t.gh.prComments[0]?.body).toContain("❌ Not done:\n- build failed\n- criterion met (site.css:3)");
+    expect(t.gh.comments[0]?.body).toContain("❌ Not done:\n- build failed\n- criterion met (site.css:3)");
     expect(t.events.types).toEqual(["started", "sent_back"]);
   });
 
@@ -193,14 +195,14 @@ describe("runQaLane: sent back to building", () => {
     const result = await t.run();
     expect(result).toMatchObject({ status: "sent_back", reason: expect.stringContaining("test failed") });
     expect(t.shell.commands.map((c) => c.command)).toEqual(["dotnet build x.sln", "dotnet test x.sln"]);
-    expect(t.gh.prComments[0]?.body).toContain("- test failed");
+    expect(t.gh.comments[0]?.body).toContain("- test failed");
   });
 
   it("shows a placeholder when a FAIL comes without any reason", async () => {
     const t = setup();
     t.agent.output = "VERDICT: FAIL";
     await t.run();
-    expect(t.gh.prComments[0]?.body).toContain("- (the agent gave no reason)");
+    expect(t.gh.comments[0]?.body).toContain("- (the agent gave no reason)");
   });
 
   it("uses the last verdict, so quoted text in the answer cannot override it", async () => {
@@ -216,9 +218,9 @@ describe("runQaLane: inconclusive keeps the card in qa", () => {
     expect(result.status === "inconclusive" && result.reason).toMatch(reason);
     expect(t.gh.issues.get(4)?.labels).toEqual(["qa"]);
     expect(t.gh.edits).toEqual([]);
-    expect(t.gh.prComments).toHaveLength(1);
-    expect(t.gh.prComments[0]?.body).toMatch(/^\[qa\] inconclusive at a1b2c3d\n/);
-    expect(t.gh.prComments[0]?.body).toContain("Next: card stays in qa, rerun the qa lane.");
+    expect(t.gh.comments).toHaveLength(1);
+    expect(t.gh.comments[0]?.body).toMatch(/^\[qa\] inconclusive at a1b2c3d\n/);
+    expect(t.gh.comments[0]?.body).toContain("Next: card stays in qa, rerun the qa lane.");
     expect(t.events.types.at(-1)).toBe("inconclusive");
     expect(t.log).toContain("git.worktreeRemove");
     expect(qaExitCode(result)).toBe(2);
@@ -251,12 +253,12 @@ describe("runQaLane: inconclusive keeps the card in qa", () => {
     expect(t.log).toContain("git.worktreeRemove");
   });
 
-  it("and still returns the result when commenting on the PR also fails", async () => {
+  it("and still returns the result when commenting on the issue also fails", async () => {
     const t = setup();
     t.agent.output = "nothing useful";
-    t.gh.failOnce.set("commentPr", new Error("HTTP 500"));
+    t.gh.failOnce.set("comment", new Error("HTTP 500"));
     expect((await t.run()).status).toBe("inconclusive");
-    expect(t.said.some((m) => m.includes("could not comment on PR #12"))).toBe(true);
+    expect(t.said.some((m) => m.includes("could not comment on issue #4"))).toBe(true);
   });
 });
 
@@ -278,15 +280,16 @@ describe("runQaLane: nothing to do, or wrong input", () => {
     expect(t.gh.edits).toEqual([]);
   });
 
-  it("refuses a card without an open PR, before creating a worktree", async () => {
+  it("refuses a card whose branch is not on origin, before creating a worktree", async () => {
     const t = setup();
-    t.gh.openPrs.clear();
+    t.git.remoteBranches.clear();
     const error = await t.run().catch((e: unknown) => e);
     expect(error).toBeInstanceOf(UsageError);
-    expect((error as UsageError).message).toBe("no open PR for branch issue-4");
+    expect((error as UsageError).message).toBe("branch issue-4 not found on origin");
     expect((error as UsageError).exitCode).toBe(65);
-    expect(t.log.some((l) => l.startsWith("git."))).toBe(false);
-    expect(t.gh.prComments).toEqual([]);
+    expect(t.log.filter((l) => l.startsWith("git."))).toEqual(["git.remoteBranchExists issue-4"]);
+    expect(t.gh.edits).toEqual([]);
+    expect(t.gh.comments).toEqual([]);
   });
 
   it("rejects an unknown placeholder in the prompt before touching anything", async () => {
@@ -300,7 +303,7 @@ describe("runQaLane: nothing to do, or wrong input", () => {
     t.git.failOnce.set("fetch", new Error("couldn't find remote ref issue-4"));
     const result = await t.run();
     expect(result).toMatchObject({ status: "failed", issue: 4, reason: expect.stringContaining("could not fetch issue-4") });
-    expect(t.gh.prComments).toEqual([]);
+    expect(t.gh.comments).toEqual([]);
     expect(t.gh.issues.get(4)?.labels).toEqual(["qa"]);
     expect(qaExitCode(result)).toBe(1);
   });
@@ -320,7 +323,7 @@ describe("runQaLane: projects without checks", () => {
     const t = setup(makeProject({ stack: "other", commands: {} }));
     expect((await t.run()).status).toBe("passed");
     expect(t.shell.commands).toEqual([]);
-    expect(t.gh.prComments[0]?.body).toContain("Did: agent review only (no build or test command configured).");
+    expect(t.gh.comments[0]?.body).toContain("Did: agent review only (no build or test command configured).");
     expect(t.events.types).toEqual(["started", "passed"]);
     expect(t.agent.runs[0]?.prompt).toContain("Build: (none configured). Test: (none configured).");
   });
@@ -329,7 +332,7 @@ describe("runQaLane: projects without checks", () => {
     const t = setup(makeProject({ commands: { test: "npm test" }, stack: "node" }));
     await t.run();
     expect(t.shell.commands.map((c) => c.command)).toEqual(["npm test"]);
-    expect(t.gh.prComments[0]?.body).toContain("Did: test, agent review.");
+    expect(t.gh.comments[0]?.body).toContain("Did: test, agent review.");
     expect(t.agent.runs[0]?.allowedTools).toContain("Bash(npm:*)");
   });
 });
@@ -348,7 +351,7 @@ describe("runQaLane: worktree", () => {
     t.git.shas = ["1234567890abcdef1234567890abcdef12345678"];
     await t.run();
     expect(t.git.detachedAdds[0]?.sha).toBe("1234567890abcdef1234567890abcdef12345678");
-    expect(t.gh.prComments[0]?.body).toContain("[qa] pass at 1234567");
+    expect(t.gh.comments[0]?.body).toContain("[qa] pass at 1234567");
   });
 });
 
@@ -360,9 +363,9 @@ describe("runQaLane: dry run", () => {
 
     const result = await t.run({ dryRun: true, deps });
 
-    expect(result).toEqual({ status: "dry_run", issue: 4, pr: 12 });
+    expect(result).toEqual({ status: "dry_run", issue: 4 });
     expect(t.gh.edits).toEqual([]);
-    expect(t.gh.prComments).toEqual([]);
+    expect(t.gh.comments).toEqual([]);
     expect(t.agent.runs).toEqual([]);
     expect(t.shell.commands).toEqual([]);
     expect(t.git.detachedAdds).toEqual([]);
@@ -376,11 +379,11 @@ describe("runQaLane: dry run", () => {
 
 describe("qaExitCode", () => {
   it("is 0 for pass, no-op and dry run, 1 for fail, 2 for inconclusive", () => {
-    expect(qaExitCode({ status: "passed", issue: 1, pr: 1 })).toBe(0);
+    expect(qaExitCode({ status: "passed", issue: 1 })).toBe(0);
     expect(qaExitCode({ status: "noop" })).toBe(0);
-    expect(qaExitCode({ status: "dry_run", issue: 1, pr: 1 })).toBe(0);
-    expect(qaExitCode({ status: "sent_back", issue: 1, pr: 1, reason: "x" })).toBe(1);
+    expect(qaExitCode({ status: "dry_run", issue: 1 })).toBe(0);
+    expect(qaExitCode({ status: "sent_back", issue: 1, reason: "x" })).toBe(1);
     expect(qaExitCode({ status: "failed", reason: "x" })).toBe(1);
-    expect(qaExitCode({ status: "inconclusive", issue: 1, pr: 1, reason: "x" })).toBe(2);
+    expect(qaExitCode({ status: "inconclusive", issue: 1, reason: "x" })).toBe(2);
   });
 });

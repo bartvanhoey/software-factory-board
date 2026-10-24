@@ -53,9 +53,18 @@ function Card({ issue, now }: { issue: BoardIssue; now: Date }) {
             PR #{issue.pr.number}
           </a>
           <span className="text-zinc-500 dark:text-zinc-400">
-            {issue.pr.merged ? "merged" : issue.pr.draft ? "draft" : "ready for review"}
+            {issue.pr.merged ? "merged" : issue.pr.draft ? "draft" : "approved, ready to merge"}
           </span>
           {checks && <span className={checks.className}>{checks.label}</span>}
+        </p>
+      )}
+      {issue.branch && !issue.pr && (
+        <p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-xs">
+          <span className="font-medium">branch {issue.branch.name}</span>
+          <a href={issue.branch.compareUrl} className="text-zinc-500 hover:underline dark:text-zinc-400">
+            compare
+          </a>
+          <span className="text-zinc-500 dark:text-zinc-400">no PR until approved</span>
         </p>
       )}
       {issue.laneConflict && (

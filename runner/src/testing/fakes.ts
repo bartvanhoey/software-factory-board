@@ -8,14 +8,20 @@ export class FakeGh implements Gh {
   labels = new Set<string>();
   issues = new Map<number, IssueData>();
   /** Open pull requests by head branch. */
-  openPrs = new Map<string, { number: number; url: string }>();
+  openPrs = new Map<string, { number: number; url: string; isDraft?: boolean }>();
+  /** What `listIssueComments` returns: the issue's comment thread, oldest first. */
+  issueThread: { author: string; body: string }[] = [];
+  markedReady: number[] = [];
+  merges: { number: number; sha: string }[] = [];
   me = { login: "factory-bot", id: 42 };
+  prNumber = 7;
   prUrl = "https://github.com/o/r/pull/7";
   /** method name -> error to throw on its next call. */
   failOnce = new Map<string, Error>();
   edits: { number: number; edit: IssueEdit }[] = [];
+  /** Comments posted on issues. */
   comments: { number: number; body: string }[] = [];
-  prComments: { number: number; body: string }[] = [];
+  /** Pull requests opened with `createPr`. */
   prs: { base: string; head: string; title: string; body: string }[] = [];
   createdLabels: LabelSpec[] = [];
 
@@ -73,16 +79,28 @@ export class FakeGh implements Gh {
   }
   async findOpenPr(_repo: string, branch: string) {
     this.enter("findOpenPr", branch);
-    return this.openPrs.get(branch) ?? null;
+    const pr = this.openPrs.get(branch);
+    return pr ? { ...pr, isDraft: pr.isDraft ?? false } : null;
   }
-  async commentPr(_repo: string, number: number, body: string) {
-    this.enter("commentPr", String(number));
-    this.prComments.push({ number, body });
+  async listIssueComments(_repo: string, number: number) {
+    this.enter("listIssueComments", String(number));
+    return this.issueThread.map((c) => ({ ...c }));
   }
-  async createDraftPr(_repo: string, pr: { base: string; head: string; title: string; body: string }) {
-    this.enter("createDraftPr", pr.head);
+  async markPrReady(_repo: string, number: number) {
+    this.enter("markPrReady", String(number));
+    this.markedReady.push(number);
+  }
+  async mergePr(_repo: string, number: number, opts: { matchHeadCommit: string }) {
+    this.enter("mergePr", `${number} ${opts.matchHeadCommit.slice(0, 7)}`);
+    this.merges.push({ number, sha: opts.matchHeadCommit });
+    for (const [branch, pr] of this.openPrs) if (pr.number === number) this.openPrs.delete(branch);
+  }
+  async createPr(_repo: string, pr: { base: string; head: string; title: string; body: string }) {
+    this.enter("createPr", pr.head);
     this.prs.push(pr);
-    return this.prUrl;
+    const created = { number: this.prNumber, url: this.prUrl };
+    this.openPrs.set(pr.head, created);
+    return created;
   }
   async cloneRepo(repo: string, dir: string) {
     this.enter("cloneRepo", `${repo} ${dir}`);
@@ -98,6 +116,12 @@ export class FakeGit implements Git {
   /** What `rev-parse` returns, call by call; the last value repeats. */
   shas: string[] = ["a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0"];
   detachedAdds: { path: string; sha: string }[] = [];
+  /** What `rev-parse` returns for one specific ref, call by call; the last value repeats. */
+  refShas = new Map<string, string[]>();
+  /** Whether `git merge` succeeds; false simulates a conflict. */
+  mergeOk = true;
+  merged: { cwd: string; sha: string }[] = [];
+  deletedRemote: string[] = [];
   failOnce = new Map<string, Error>();
 
   constructor(private readonly log: CallLog = []) {}
@@ -128,8 +152,18 @@ export class FakeGit implements Git {
   }
   async revParse(_cwd: string, ref: string) {
     this.enter("revParse", ref);
-    const sha = this.shas.length > 1 ? this.shas.shift() : this.shas[0];
+    const queue = this.refShas.get(ref) ?? this.shas;
+    const sha = queue.length > 1 ? queue.shift() : queue[0];
     return sha as string;
+  }
+  async merge(cwd: string, sha: string) {
+    this.enter("merge", sha.slice(0, 7));
+    this.merged.push({ cwd, sha });
+    return this.mergeOk;
+  }
+  async deleteRemoteBranch(_cwd: string, branch: string) {
+    this.enter("deleteRemoteBranch", branch);
+    this.deletedRemote.push(branch);
   }
   async worktreeRemove() {
     this.enter("worktreeRemove");

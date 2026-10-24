@@ -28,6 +28,8 @@ export const ProjectSchema = z
         maxTurns: z.number().int().positive().default(20),
         /** Agent turn cap for the qa lane. */
         qaMaxTurns: z.number().int().positive().default(20),
+        /** Agent turn cap for the review lane. */
+        reviewMaxTurns: z.number().int().positive().default(20),
       })
       .strict()
       .default({}),

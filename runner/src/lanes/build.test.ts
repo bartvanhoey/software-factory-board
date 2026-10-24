@@ -56,13 +56,13 @@ const inOrder = (log: string[], ...steps: string[]) => {
 };
 
 describe("runBuildLane: happy path", () => {
-  it("takes a ready issue to a draft PR and the qa label, in order", async () => {
+  it("takes a ready issue to a pushed branch and the qa label, in order, without opening a PR", async () => {
     const t = setup();
     t.gh.addIssue(4, ["ready", "bug"], { title: "Add paging", body: "Page the list." });
 
     const result = await t.run();
 
-    expect(result).toEqual({ status: "done", issue: 4, prUrl: t.gh.prUrl });
+    expect(result).toEqual({ status: "done", issue: 4, branch: "issue-4", compareUrl: "https://github.com/o/r/compare/main...issue-4" });
     inOrder(
       t.log,
       "gh.listLabels",
@@ -78,14 +78,16 @@ describe("runBuildLane: happy path", () => {
       "git.isClean",
       "shell.run dotnet test x.sln",
       "git.push issue-4",
-      "gh.createDraftPr issue-4",
       "gh.editIssue 4 +[qa] -[building]",
       "gh.comment 4",
       "git.worktreeRemove",
     );
     expect(t.gh.issues.get(4)?.labels).toEqual(["bug", "qa"]);
     expect(t.gh.edits[0]?.edit.addAssignee).toBe("factory-bot");
-    expect(t.events.types).toEqual(["started", "claimed", "agent_done", "verified", "pr_opened", "handed_off"]);
+    expect(t.events.types).toEqual(["started", "claimed", "agent_done", "verified", "pushed", "handed_off"]);
+    // A PR means "approved", and only the review lane opens one.
+    expect(t.gh.prs).toEqual([]);
+    expect(t.log.some((l) => l.startsWith("gh.createPr") || l.startsWith("gh.findOpenPr"))).toBe(false);
   });
 
   it("runs the agent in the worktree with the rendered prompt, the stack's tools and a git identity", async () => {
@@ -109,17 +111,17 @@ describe("runBuildLane: happy path", () => {
     });
   });
 
-  it("opens the PR against the project's default branch with Closes and the test result", async () => {
+  it("comments on the issue with the compare link against the default branch and the test result", async () => {
     const t = setup(makeProject({ defaultBranch: "develop" }));
     t.gh.addIssue(4, ["ready"], { title: "Add paging" });
     await t.run();
 
-    expect(t.gh.prs).toHaveLength(1);
-    expect(t.gh.prs[0]).toMatchObject({ base: "develop", head: "issue-4", title: "Add paging" });
-    expect(t.gh.prs[0]?.body).toContain("Closes #4");
-    expect(t.gh.prs[0]?.body).toContain("Independent `dotnet test x.sln`: passed.");
+    expect(t.gh.prs).toEqual([]);
     expect(t.log).toContain("git.worktreeAdd issue-4 from origin/develop");
-    expect(t.gh.comments[0]?.body).toContain(`Draft PR: ${t.gh.prUrl}`);
+    expect(t.gh.comments).toHaveLength(1);
+    expect(t.gh.comments[0]?.body).toBe(
+      "[build] done. Branch issue-4 pushed (compare: https://github.com/o/r/compare/develop...issue-4). Independent `dotnet test x.sln`: passed. Next: qa.",
+    );
     expect(t.shell.commands[0]).toEqual({ command: "dotnet test x.sln", cwd: join(WORKTREES, "issue-4") });
   });
 
@@ -175,7 +177,7 @@ describe("runBuildLane: verification by project", () => {
     t.gh.addIssue(4, ["ready"]);
     await t.run();
     expect(t.shell.commands.map((c) => c.command)).toEqual(["make build"]);
-    expect(t.gh.prs[0]?.body).toContain("No tests configured. Independent build `make build`: passed.");
+    expect(t.gh.comments[0]?.body).toContain("No tests configured. Independent build `make build`: passed.");
   });
 
   it("skips verification and says so when there is neither build nor test command", async () => {
@@ -184,8 +186,8 @@ describe("runBuildLane: verification by project", () => {
     const result = await t.run();
     expect(result.status).toBe("done");
     expect(t.shell.commands).toEqual([]);
-    expect(t.gh.prs[0]?.body).toContain("Tests: none configured.");
-    expect(t.gh.prs[0]?.body).not.toContain("passed");
+    expect(t.gh.comments[0]?.body).toContain("Tests: none configured.");
+    expect(t.gh.comments[0]?.body).not.toContain("passed");
     expect(t.events.events.find((e) => e.type === "verified")?.message).toMatch(/skipped/);
     expect(t.agent.runs[0]?.prompt).toContain("(none configured)");
   });
@@ -249,7 +251,7 @@ describe("runBuildLane: failures keep the card in building", () => {
     const t = setup();
     t.gh.addIssue(4, ["ready"]);
     t.git.failOnce.set("push", new Error("remote rejected"));
-    expectFailed(t, await t.run(), /could not push or open the pull request \(remote rejected\)/);
+    expectFailed(t, await t.run(), /could not push the branch \(remote rejected\)/);
   });
 
   it("when the branch already exists on origin, without creating a worktree", async () => {
@@ -359,7 +361,7 @@ describe("runBuildLane: dry run", () => {
 
     const result = await t.run({ dryRun: true, deps });
 
-    expect(result).toEqual({ status: "done", issue: 4, prUrl: "<pr-url>" });
+    expect(result).toMatchObject({ status: "done", issue: 4, branch: "issue-4" });
     expect(t.gh.edits).toEqual([]);
     expect(t.gh.comments).toEqual([]);
     expect(t.gh.prs).toEqual([]);
@@ -369,7 +371,7 @@ describe("runBuildLane: dry run", () => {
     expect(t.log).not.toContain("git.worktreeRemove");
     expect(printed.some((l) => l.includes("editIssue"))).toBe(true);
     expect(printed.some((l) => l.includes("worktreeAdd"))).toBe(true);
-    expect(printed.some((l) => l.includes("createDraftPr"))).toBe(true);
+    expect(printed.some((l) => l.includes("createPr"))).toBe(false);
     expect(printed.some((l) => l.includes("push"))).toBe(true);
   });
 

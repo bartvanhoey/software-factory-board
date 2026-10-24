@@ -29,11 +29,16 @@ export interface Gh {
   getIssue(repo: string, number: number): Promise<IssueData>;
   editIssue(repo: string, number: number, edit: IssueEdit): Promise<void>;
   comment(repo: string, number: number, body: string): Promise<void>;
+  /** The comments on an issue, oldest first, with the login of each author. */
+  listIssueComments(repo: string, number: number): Promise<{ author: string; body: string }[]>;
   /** The open pull request whose head is `branch`, or null. */
-  findOpenPr(repo: string, branch: string): Promise<{ number: number; url: string } | null>;
-  commentPr(repo: string, number: number, body: string): Promise<void>;
-  /** Returns the URL of the new pull request. */
-  createDraftPr(repo: string, pr: { base: string; head: string; title: string; body: string }): Promise<string>;
+  findOpenPr(repo: string, branch: string): Promise<{ number: number; url: string; isDraft: boolean } | null>;
+  /** Marks a draft PR ready for review. Only needed for a PR that an older flow opened as a draft. */
+  markPrReady(repo: string, number: number): Promise<void>;
+  /** Squash-merges the PR only if its head is still `matchHeadCommit`. Rejects when GitHub refuses. */
+  mergePr(repo: string, number: number, opts: { matchHeadCommit: string }): Promise<void>;
+  /** Opens a normal (not draft) pull request. Only the review lane calls this, after an approval. */
+  createPr(repo: string, pr: { base: string; head: string; title: string; body: string }): Promise<{ number: number; url: string }>;
   cloneRepo(repo: string, dir: string): Promise<void>;
 }
 
@@ -44,6 +49,9 @@ export interface Git {
   /** A worktree at one exact commit, on no branch. */
   worktreeAddDetached(cwd: string, path: string, sha: string): Promise<void>;
   revParse(cwd: string, ref: string): Promise<string>;
+  /** `git merge --no-commit --no-ff`: true when it merged cleanly, false on a conflict. */
+  merge(cwd: string, sha: string): Promise<boolean>;
+  deleteRemoteBranch(cwd: string, branch: string): Promise<void>;
   /** Removes a worktree if it exists; never throws for a missing one. */
   worktreeRemove(cwd: string, path: string): Promise<void>;
   branchExists(cwd: string, branch: string): Promise<boolean>;

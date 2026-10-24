@@ -24,6 +24,7 @@ export async function loadBoard(): Promise<BoardData> {
   const infos: ProjectInfo[] = loadProjects(projectsDir()).map((p) => ({
     name: p.name,
     repo: p.repo,
+    defaultBranch: p.defaultBranch,
     stack: p.stack,
     hasTests: hasTests(p),
     enabled: p.enabled,

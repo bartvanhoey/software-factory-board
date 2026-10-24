@@ -100,7 +100,9 @@ function checksOf(pr: z.infer<typeof PrSchema>): ChecksState {
   return "pending";
 }
 
-function toIssue(project: string, node: IssueNode, now: Date): BoardIssue | null {
+type BranchSource = Pick<ProjectInfo, "repo" | "defaultBranch">;
+
+function toIssue(project: string, node: IssueNode, now: Date, source?: BranchSource): BoardIssue | null {
   const labels = node.labels.nodes.map((l) => l.name);
   const prNode = node.closedByPullRequestsReferences?.nodes[0];
 
@@ -119,6 +121,15 @@ function toIssue(project: string, node: IssueNode, now: Date): BoardIssue | null
     ? { number: prNode.number, url: prNode.url, draft: prNode.isDraft, merged: prNode.merged, checks: checksOf(prNode) }
     : null;
 
+  // The build lane pushes `issue-<n>` and opens no PR: until the review approves, the work is a branch.
+  const branch =
+    source && !pr && (resolved.lane === "qa" || resolved.lane === "review")
+      ? {
+          name: `issue-${node.number}`,
+          compareUrl: `https://github.com/${source.repo}/compare/${source.defaultBranch}...issue-${node.number}`,
+        }
+      : null;
+
   return {
     project,
     number: node.number,
@@ -129,16 +140,17 @@ function toIssue(project: string, node: IssueNode, now: Date): BoardIssue | null
     assignee: node.assignees.nodes[0]?.login ?? null,
     updatedAt: node.updatedAt,
     pr,
+    branch,
   };
 }
 
 /** Turn one repository's GraphQL data into board issues (deduplicated by number). */
-export function parseRepo(project: string, repo: z.infer<typeof RepoSchema>, now: Date): BoardIssue[] {
+export function parseRepo(project: string, repo: z.infer<typeof RepoSchema>, now: Date, source?: BranchSource): BoardIssue[] {
   const seen = new Map<number, BoardIssue>();
   for (const key of ["ready", "building", "qa", "review", "done"] as const) {
     for (const node of repo[key].nodes) {
       if (seen.has(node.number)) continue;
-      const issue = toIssue(project, node, now);
+      const issue = toIssue(project, node, now, source);
       if (issue) seen.set(node.number, issue);
     }
   }
@@ -193,7 +205,7 @@ export async function fetchBoards(
   for (const [alias, info] of byAlias) {
     const repo = data?.[alias];
     if (repo) {
-      results.set(info.name, { info, status: "ok", issues: parseRepo(info.name, repo, now) });
+      results.set(info.name, { info, status: "ok", issues: parseRepo(info.name, repo, now, info) });
       continue;
     }
     const message =
