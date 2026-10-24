@@ -17,12 +17,15 @@ export function dryRunGh(real: Gh, print: (line: string) => void): Gh {
     async comment(repo: string, number: number, body: string) {
       print(fmt("comment", [repo, number, body]));
     },
-    async commentPr(repo: string, number: number, body: string) {
-      print(fmt("commentPr", [repo, number, body]));
+    async markPrReady(repo: string, number: number) {
+      print(fmt("markPrReady", [repo, number]));
     },
-    async createDraftPr(repo: string, pr: { base: string; head: string; title: string; body: string }) {
-      print(fmt("createDraftPr", [repo, pr.base, pr.head, pr.title]));
-      return "<pr-url>";
+    async mergePr(repo: string, number: number, opts: { matchHeadCommit: string }) {
+      print(fmt("mergePr", [repo, number, "squash", opts.matchHeadCommit.slice(0, 7)]));
+    },
+    async createPr(repo: string, pr: { base: string; head: string; title: string; body: string }) {
+      print(fmt("createPr", [repo, pr.base, pr.head, pr.title]));
+      return { number: 0, url: "<pr-url>" };
     },
   });
 }
@@ -41,6 +44,12 @@ export function dryRunGit(real: Git, print: (line: string) => void): Git {
     },
     async deleteBranch(_cwd: string, branch: string) {
       print(fmt("deleteBranch", [branch]));
+    },
+    async deleteRemoteBranch(_cwd: string, branch: string) {
+      print(fmt("deleteRemoteBranch", [branch]));
+    },
+    async commitAll(_cwd: string, message: string) {
+      print(fmt("commitAll", [message.split("\n")[0]]));
     },
     async push(_cwd: string, branch: string) {
       print(fmt("push", [branch]));

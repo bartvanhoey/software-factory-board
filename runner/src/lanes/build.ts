@@ -1,7 +1,9 @@
 import { join } from "node:path";
 import type { Project } from "@factory/shared";
 import { UsageError, EXIT, errorMessage } from "../errors.js";
+import { compareUrl } from "../links.js";
 import { allowedToolsFor, renderPrompt, verifyStep } from "../prompt.js";
+import { isSecretPath } from "../secrets.js";
 import type { AgentRunner, EventLog, Gh, Git, LabelEnsurer, Shell } from "../ports.js";
 
 export interface BuildDeps {
@@ -28,15 +30,23 @@ export interface BuildOptions {
 
 export type BuildResult =
   | { status: "noop" }
-  | { status: "done"; issue: number; prUrl: string }
+  | { status: "done"; issue: number; branch: string; compareUrl: string }
   | { status: "failed"; issue?: number; reason: string };
 
 const hasLabel = (labels: readonly string[], name: string): boolean =>
   labels.some((l) => l.toLowerCase() === name);
 
+/** Subject and body of the commit the lane makes when the builder left its changes uncommitted. */
+export function autoCommitMessage(number: number, title: string): string {
+  const oneLine = title.replace(/\s+/g, " ").trim();
+  const subject = oneLine.length > 72 ? `${oneLine.slice(0, 71)}…` : oneLine;
+  return `🤖 [build] #${number}: ${subject}\n\nCommitted by the build lane: the builder left its changes uncommitted.`;
+}
+
 /**
  * The build lane: claim one `ready` issue, build it in an isolated worktree with the agent,
- * verify the result independently, open a draft PR and move the card to `qa`.
+ * verify the result independently, push the branch and move the card to `qa`. It opens no PR:
+ * a PR means "approved", and only the review lane opens one.
  * On a failure after the claim the card stays in `building` with a comment on the issue.
  */
 export async function runBuildLane(deps: BuildDeps, opts: BuildOptions): Promise<BuildResult> {
@@ -124,6 +134,7 @@ export async function runBuildLane(deps: BuildDeps, opts: BuildOptions): Promise
   const worktree = join(opts.paths.worktreeRoot, branch);
   const logFile = join(opts.paths.logDir, `${branch}.log`);
   let worktreeCreated = false;
+  let laneCommitted = false;
 
   try {
     // 4. Isolate.
@@ -141,11 +152,11 @@ export async function runBuildLane(deps: BuildDeps, opts: BuildOptions): Promise
 
     // 5. Build, then verify without trusting the agent's own claims.
     const verify = verifyStep(project);
+    const identity = { name: me.login, email: `${me.id}+${me.login}@users.noreply.github.com` };
     if (dryRun) {
       say(`dry-run: would run the agent in ${worktree} (max ${project.limits.maxTurns} turns)`);
     } else {
       say(`builder agent running; follow with: tail -f ${logFile}`);
-      const identity = { name: me.login, email: `${me.id}+${me.login}@users.noreply.github.com` };
       try {
         await agent.run({
           cwd: worktree,
@@ -165,7 +176,24 @@ export async function runBuildLane(deps: BuildDeps, opts: BuildOptions): Promise
       }
       emit("agent_done", "builder agent finished", { issue: number });
 
-      if ((await git.commitsAhead(worktree, `origin/${project.defaultBranch}`)) < 1) return await fail("builder made no commit");
+      // The agent should commit itself. If it made no commit but left changes, the lane commits them
+      // as the bot, so finished work is not lost. Leftovers next to an agent commit stay a failure.
+      if ((await git.commitsAhead(worktree, `origin/${project.defaultBranch}`)) < 1) {
+        const changed = await git.statusPaths(worktree);
+        if (changed.length === 0) return await fail("builder made no commit");
+        const secrets = changed.filter(isSecretPath);
+        if (secrets.length > 0) {
+          return await fail(`builder left uncommitted files that look like secrets (${secrets.join(", ")}); nothing was committed`);
+        }
+        say(`builder made no commit: committing its ${changed.length} changed file(s) as ${identity.name}`);
+        try {
+          await git.commitAll(worktree, autoCommitMessage(number, issue.title), identity);
+        } catch (e) {
+          return await fail(`could not commit the builder's changes (${errorMessage(e)})`);
+        }
+        laneCommitted = true;
+        emit("autocommitted", `committed ${changed.length} file(s) the builder left uncommitted`, { issue: number });
+      }
       if (!(await git.isClean(worktree))) return await fail("builder left uncommitted changes");
 
       if (verify) {
@@ -185,27 +213,23 @@ export async function runBuildLane(deps: BuildDeps, opts: BuildOptions): Promise
         ? `Independent \`${verify.command}\`: passed.`
         : `No tests configured. Independent build \`${verify.command}\`: passed.`
       : "Tests: none configured.";
-    say(`push ${branch} and open draft PR`);
-    let prUrl: string;
+    // Only the branch is pushed. The review lane opens the PR after an approval.
+    say(`push ${branch}`);
+    const compare = compareUrl(repo, project.defaultBranch, branch);
     try {
       await git.push(worktree, branch);
-      prUrl = await gh.createDraftPr(repo, {
-        base: project.defaultBranch,
-        head: branch,
-        title: issue.title,
-        body: `Closes #${number}\n\nBuilt by the build lane (runner).\n${verifyLine}`,
-      });
     } catch (e) {
-      return await fail(`could not push or open the pull request (${errorMessage(e)})`);
+      return await fail(`could not push the branch (${errorMessage(e)})`);
     }
-    emit("pr_opened", `draft PR ${prUrl}`, { issue: number, url: prUrl });
+    emit("pushed", `pushed ${branch}`, { issue: number, url: compare });
 
     say("building -> qa");
     await gh.editIssue(repo, number, { removeLabels: ["building"], addLabels: ["qa"] });
-    await gh.comment(repo, number, `[build] done. Draft PR: ${prUrl}. ${verifyLine} Next: qa.`);
-    emit("handed_off", "building -> qa", { issue: number, url: prUrl });
-    say(`done: ${prUrl}`);
-    return { status: "done", issue: number, prUrl };
+    const note = laneCommitted ? " The lane committed the builder's changes itself, because the builder left them uncommitted." : "";
+    await gh.comment(repo, number, `[build] done. Branch ${branch} pushed (compare: ${compare}). ${verifyLine}${note} Next: qa.`);
+    emit("handed_off", "building -> qa", { issue: number, url: compare });
+    say(`done: ${compare}`);
+    return { status: "done", issue: number, branch, compareUrl: compare };
   } catch (e) {
     return await fail(`unexpected error: ${errorMessage(e)}`);
   } finally {

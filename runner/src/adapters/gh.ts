@@ -9,7 +9,10 @@ const gh = (args: string[], input?: string): Promise<string> => mustRun("gh", ar
 const UserSchema = z.object({ login: z.string(), id: z.number() });
 const NamesSchema = z.array(z.object({ name: z.string() }));
 const NumbersSchema = z.array(z.object({ number: z.number() }));
-const PrsSchema = z.array(z.object({ number: z.number(), url: z.string() }));
+const PrsSchema = z.array(z.object({ number: z.number(), url: z.string(), isDraft: z.boolean() }));
+const CommentsSchema = z.object({
+  comments: z.array(z.object({ author: z.object({ login: z.string() }).nullable(), body: z.string() })),
+});
 const IssueSchema = z.object({
   number: z.number(),
   title: z.string(),
@@ -63,20 +66,32 @@ export const ghCli: Gh = {
   },
 
   async findOpenPr(repo, branch) {
-    const out = await gh(["pr", "list", "-R", repo, "--head", branch, "--state", "open", "--json", "number,url"]);
+    const out = await gh(["pr", "list", "-R", repo, "--head", branch, "--state", "open", "--json", "number,url,isDraft"]);
     return PrsSchema.parse(JSON.parse(out))[0] ?? null;
   },
 
-  async commentPr(repo, number, body) {
-    await gh(["pr", "comment", String(number), "-R", repo, "--body-file", "-"], body);
+  async listIssueComments(repo, number) {
+    const out = await gh(["issue", "view", String(number), "-R", repo, "--json", "comments"]);
+    return CommentsSchema.parse(JSON.parse(out)).comments.map((c) => ({ author: c.author?.login ?? "", body: c.body }));
   },
 
-  async createDraftPr(repo, pr) {
+  async markPrReady(repo, number) {
+    await gh(["pr", "ready", String(number), "-R", repo]);
+  },
+
+  async mergePr(repo, number, opts) {
+    await gh(["pr", "merge", String(number), "-R", repo, "--squash", "--match-head-commit", opts.matchHeadCommit]);
+  },
+
+  async createPr(repo, pr) {
     const out = await gh(
-      ["pr", "create", "-R", repo, "--draft", "--base", pr.base, "--head", pr.head, "--title", pr.title, "--body-file", "-"],
+      ["pr", "create", "-R", repo, "--base", pr.base, "--head", pr.head, "--title", pr.title, "--body-file", "-"],
       pr.body,
     );
-    return out.trim().split("\n").at(-1) ?? "";
+    const url = out.trim().split("\n").at(-1) ?? "";
+    const number = /\/pull\/(\d+)$/.exec(url)?.[1];
+    if (number === undefined) throw new Error(`gh pr create printed no pull request URL: ${url}`);
+    return { number: Number(number), url };
   },
 
   async cloneRepo(repo, dir) {

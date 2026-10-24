@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import type { NewEvent, Project } from "@factory/shared";
 import { EXIT, UsageError, errorMessage } from "../errors.js";
+import { compareUrl } from "../links.js";
 import type { AgentRunner, Gh, Git, LabelEnsurer, Shell, EventLog } from "../ports.js";
 import { qaToolsFor, renderPrompt } from "../prompt.js";
 import { parseVerdict } from "../verdict.js";
@@ -24,16 +25,16 @@ export interface QaOptions {
   promptTemplate: string;
   /** A specific issue to test; default is the oldest one labelled `qa`. */
   issue?: number;
-  /** Stop after picking the card and finding its PR; mutating calls are expected to be no-ops. */
+  /** Stop after picking the card and fetching its branch; mutating calls are expected to be no-ops. */
   dryRun: boolean;
 }
 
 export type QaResult =
   | { status: "noop" }
-  | { status: "dry_run"; issue: number; pr: number }
-  | { status: "passed"; issue: number; pr: number }
-  | { status: "sent_back"; issue: number; pr: number; reason: string }
-  | { status: "inconclusive"; issue: number; pr: number; reason: string }
+  | { status: "dry_run"; issue: number }
+  | { status: "passed"; issue: number }
+  | { status: "sent_back"; issue: number; reason: string }
+  | { status: "inconclusive"; issue: number; reason: string }
   | { status: "failed"; issue?: number; reason: string };
 
 /** Exit code for a result, as in scripts/qa.sh: 0 pass, 1 fail, 2 inconclusive. */
@@ -47,10 +48,11 @@ const hasLabel = (labels: readonly string[], name: string): boolean =>
   labels.some((l) => l.toLowerCase() === name);
 
 /**
- * The qa lane: test the PR of one `qa` card in a fresh worktree pinned to the branch's commit.
+ * The qa lane: test the branch `issue-<n>` of one `qa` card in a fresh worktree pinned to its commit.
+ * There is no PR yet, so the verdict comments go on the issue.
  * Mechanical checks (the project's build and test commands) run first, then a read-only agent
  * reviews the change. Pass moves the card to `review`; a failed check or a FAIL verdict sends it
- * back to `building`; anything the lane cannot decide leaves it in `qa` with a comment on the PR.
+ * back to `building`; anything the lane cannot decide leaves it in `qa` with a comment on the issue.
  */
 export async function runQaLane(deps: QaDeps, opts: QaOptions): Promise<QaResult> {
   const { gh, git, agent, shell, events, labels, say, writeText } = deps;
@@ -85,9 +87,12 @@ export async function runQaLane(deps: QaDeps, opts: QaOptions): Promise<QaResult
     throw new UsageError(`issue #${number} is not labelled qa`, EXIT.precondition);
   }
   const branch = `issue-${number}`;
-  const pr = await gh.findOpenPr(repo, branch);
-  if (!pr) throw new UsageError(`no open PR for branch ${branch}`, EXIT.precondition);
   const prompt = `${renderPrompt(opts.promptTemplate, project)}\n\n## Issue #${number}: ${issue.title}\n\n${issue.body}\n`;
+  // The work is a branch: no PR exists until the review lane approves it.
+  if (!(await git.remoteBranchExists(cloneDir, branch))) {
+    throw new UsageError(`branch ${branch} not found on origin`, EXIT.precondition);
+  }
+  const compare = compareUrl(repo, project.defaultBranch, branch);
 
   try {
     await git.fetch(cloneDir, "origin", branch);
@@ -99,8 +104,8 @@ export async function runQaLane(deps: QaDeps, opts: QaOptions): Promise<QaResult
   }
   const sha = await git.revParse(cloneDir, `origin/${branch}`);
   const short = sha.slice(0, 7);
-  say(`qa #${number} (PR #${pr.number}) at commit ${short}: ${issue.title}`);
-  emit("started", `qa of PR #${pr.number} at ${short}`, { issue: number, url: pr.url });
+  say(`qa #${number} (${branch}) at commit ${short}: ${issue.title}`);
+  emit("started", `qa of ${branch} at ${short}`, { issue: number, url: compare });
 
   // 2. A dry run stops here and shows both possible outcomes.
   if (dryRun) {
@@ -108,7 +113,7 @@ export async function runQaLane(deps: QaDeps, opts: QaOptions): Promise<QaResult
     say("dry-run: pass -> qa -> review, fail -> qa -> building");
     await gh.editIssue(repo, number, { removeLabels: ["qa"], addLabels: ["review"] });
     await gh.editIssue(repo, number, { removeLabels: ["qa"], addLabels: ["building"] });
-    return { status: "dry_run", issue: number, pr: pr.number };
+    return { status: "dry_run", issue: number };
   }
 
   const worktree = join(opts.paths.worktreeRoot, `qa-${branch}`);
@@ -118,16 +123,16 @@ export async function runQaLane(deps: QaDeps, opts: QaOptions): Promise<QaResult
 
   const comment = async (body: string): Promise<void> => {
     try {
-      await gh.commentPr(repo, pr.number, body);
+      await gh.comment(repo, number, body);
     } catch (e) {
-      say(`could not comment on PR #${pr.number}: ${errorMessage(e)}`);
+      say(`could not comment on issue #${number}: ${errorMessage(e)}`);
     }
   };
   const inconclusive = async (why: string): Promise<QaResult> => {
     say(`INCONCLUSIVE: ${why} (card stays in qa)`);
-    emit("inconclusive", why, { issue: number, url: pr.url });
+    emit("inconclusive", why, { issue: number, url: compare });
     await comment(`[qa] inconclusive at ${short}\n${why}\nNext: card stays in qa, rerun the qa lane.`);
-    return { status: "inconclusive", issue: number, pr: pr.number, reason: why };
+    return { status: "inconclusive", issue: number, reason: why };
   };
   const bullets = (reasons: readonly string[]): string =>
     reasons.length > 0 ? reasons.map((r) => `- ${r}`).join("\n") : "- (the agent gave no reason)";
@@ -177,7 +182,7 @@ export async function runQaLane(deps: QaDeps, opts: QaOptions): Promise<QaResult
     }
     writeText(agentFile, answer);
 
-    // 6. Decide. If the branch moved, the result is about a commit that is no longer the PR's head.
+    // 6. Decide. If the branch moved, the result is about a commit that is no longer the branch's head.
     await git.fetch(cloneDir, "origin", branch);
     if ((await git.revParse(cloneDir, `origin/${branch}`)) !== sha) return await inconclusive("branch moved while qa ran");
 
@@ -189,17 +194,17 @@ export async function runQaLane(deps: QaDeps, opts: QaOptions): Promise<QaResult
       const reason = lines.join("; ");
       say("FAIL -> building");
       await gh.editIssue(repo, number, { removeLabels: ["qa"], addLabels: ["building"] });
-      emit("sent_back", reason, { issue: number, url: pr.url });
+      emit("sent_back", reason, { issue: number, url: compare });
       await comment(`[qa] fail at ${short}\nDid: ${did}.\n❌ Not done:\n${bullets(lines)}\nNext: back to building.`);
-      return { status: "sent_back", issue: number, pr: pr.number, reason };
+      return { status: "sent_back", issue: number, reason };
     }
 
     say("PASS -> review");
     await gh.editIssue(repo, number, { removeLabels: ["qa"], addLabels: ["review"] });
-    emit("passed", `qa passed at ${short}`, { issue: number, url: pr.url });
+    emit("passed", `qa passed at ${short}`, { issue: number, url: compare });
     await comment(`[qa] pass at ${short}\nDid: ${did}.\n✅ Done:\n${bullets(reasons)}\nNext: review.`);
     say("done");
-    return { status: "passed", issue: number, pr: pr.number };
+    return { status: "passed", issue: number };
   } catch (e) {
     return await inconclusive(`unexpected error: ${errorMessage(e)}`);
   } finally {

@@ -15,6 +15,12 @@ describe("EventSchema", () => {
     }
   });
 
+  it("accepts the review lane and its event types", () => {
+    for (const type of ["approved", "merged", "back_to_qa", "sent_back", "inconclusive"]) {
+      expect(EventSchema.safeParse({ ...ok, lane: "review", type }).success, type).toBe(true);
+    }
+  });
+
   it("rejects unknown lanes, types, keys and bad timestamps", () => {
     expect(EventSchema.safeParse({ ...ok, lane: "deploy" }).success).toBe(false);
     expect(EventSchema.safeParse({ ...ok, type: "exploded" }).success).toBe(false);

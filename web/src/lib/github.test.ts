@@ -6,9 +6,9 @@ const now = new Date("2026-01-10T12:00:00Z");
 const day = 86_400_000;
 const iso = (offsetMs: number) => new Date(now.getTime() - offsetMs).toISOString();
 
-const a: ProjectInfo = { name: "a", repo: "o/a", stack: "node", hasTests: true, enabled: true };
-const b: ProjectInfo = { name: "b", repo: "o/b", stack: "node", hasTests: true, enabled: true };
-const off: ProjectInfo = { name: "off", repo: "o/off", stack: "node", hasTests: true, enabled: false };
+const a: ProjectInfo = { name: "a", repo: "o/a", defaultBranch: "main", stack: "node", hasTests: true, enabled: true };
+const b: ProjectInfo = { name: "b", repo: "o/b", defaultBranch: "main", stack: "node", hasTests: true, enabled: true };
+const off: ProjectInfo = { name: "off", repo: "o/off", defaultBranch: "main", stack: "node", hasTests: true, enabled: false };
 
 type Node = Record<string, unknown>;
 const node = (number: number, o: Node = {}): Node => ({
@@ -89,6 +89,30 @@ describe("fetchBoards", () => {
       assignee: "bot",
       pr: { number: 9, draft: true, merged: false, checks: "failure" },
     });
+  });
+
+  it("links qa and review cards without a PR to the branch compare page, and no others", async () => {
+    const pr = { number: 9, url: "https://github.com/o/a/pull/9", isDraft: false, merged: false };
+    const master: ProjectInfo = { ...a, defaultBranch: "master" };
+    const data = {
+      p0: repo({
+        ready: [node(1, { labels: labels("ready") })],
+        building: [node(2, { labels: labels("building") })],
+        qa: [node(3, { labels: labels("qa") })],
+        review: [
+          node(4, { labels: labels("review") }),
+          node(5, { labels: labels("review"), closedByPullRequestsReferences: { nodes: [pr] } }),
+        ],
+      }),
+    };
+    const [result] = await fetchBoards([master], "t", now, respond({ data }));
+    if (result?.status !== "ok") throw new Error("expected ok");
+    const branches = Object.fromEntries(result.issues.map((i) => [i.number, i.branch]));
+    expect(branches[1]).toBeNull();
+    expect(branches[2]).toBeNull();
+    expect(branches[3]).toEqual({ name: "issue-3", compareUrl: "https://github.com/o/a/compare/master...issue-3" });
+    expect(branches[4]).toEqual({ name: "issue-4", compareUrl: "https://github.com/o/a/compare/master...issue-4" });
+    expect(branches[5]).toBeNull(); // the PR exists, so the card shows the PR
   });
 
   it("deduplicates an issue that matches several lane queries and flags the conflict", async () => {

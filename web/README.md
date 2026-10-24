@@ -24,6 +24,7 @@ Without `GH_TOKEN` the page shows demo data and says so in a banner.
 ## Board
 
 - Columns: `ready`, `building`, `qa`, `review` (issue labels) and `done` (closed in the last 7 days by a PR or with a lane label).
+- A `qa` or `review` card has no PR yet: the factory opens it only after the review approves. Until then the card shows `branch issue-<n>` with a GitHub compare link.
 - Issues without a lane label are not shown. An issue with two lane labels shows in the furthest lane with a warning.
 - `/?project=a,b` filters by project; no filter shows all. `/projects/<name>` shows one project.
 - One failing repo only marks its own project as errored; the rest still load.

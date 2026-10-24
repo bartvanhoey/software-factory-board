@@ -23,13 +23,26 @@ const project = (extra: Record<string, unknown> = {}) =>
 
 describe("parseArgs", () => {
   it("parses build and labels", () => {
-    expect(parseArgs(["build", "--project", "demo"])).toEqual({ command: "build", project: "demo", issue: undefined, dryRun: false });
+    expect(parseArgs(["build", "--project", "demo"])).toEqual({ command: "build", project: "demo", issue: undefined, merge: false, dryRun: false });
     expect(parseArgs(["build", "--project", "demo", "--issue", "12", "--dry-run"])).toMatchObject({ issue: 12, dryRun: true });
     expect(parseArgs(["labels", "--project", "demo"]).command).toBe("labels");
   });
 
+  it("parses review, where --merge is opt-in and only valid", () => {
+    expect(parseArgs(["review", "--project", "demo"])).toEqual({ command: "review", project: "demo", issue: undefined, merge: false, dryRun: false });
+    expect(parseArgs(["review", "--project", "demo", "--issue", "53", "--merge", "--dry-run"])).toMatchObject({
+      command: "review",
+      issue: 53,
+      merge: true,
+      dryRun: true,
+    });
+    for (const command of ["build", "qa", "labels"]) {
+      expect(() => parseArgs([command, "--project", "demo", "--merge"]), command).toThrow(/--merge only applies to review/);
+    }
+  });
+
   it("parses qa, with an optional issue and dry run", () => {
-    expect(parseArgs(["qa", "--project", "demo"])).toEqual({ command: "qa", project: "demo", issue: undefined, dryRun: false });
+    expect(parseArgs(["qa", "--project", "demo"])).toEqual({ command: "qa", project: "demo", issue: undefined, merge: false, dryRun: false });
     expect(parseArgs(["qa", "--project", "demo", "--issue", "53", "--dry-run"])).toMatchObject({ command: "qa", issue: 53, dryRun: true });
     expect(() => parseArgs(["qa"])).toThrow(UsageError);
   });
@@ -55,7 +68,7 @@ describe("renderPrompt / allowedToolsFor / verifyStep", () => {
   });
 
   it("renders the real prompt files, using the project's default branch and no hard-coded one", () => {
-    for (const name of ["builder.md", "qa.md"]) {
+    for (const name of ["builder.md", "qa.md", "review.md"]) {
       const template = readFileSync(join(REPO_ROOT, "prompts", name), "utf8");
       for (const defaultBranch of ["main", "master", "develop"]) {
         const text = renderPrompt(template, project({ defaultBranch, commands: { build: "make", test: "make test" } }));
@@ -67,6 +80,8 @@ describe("renderPrompt / allowedToolsFor / verifyStep", () => {
     }
     const qa = readFileSync(join(REPO_ROOT, "prompts", "qa.md"), "utf8");
     expect(renderPrompt(qa, project({ defaultBranch: "master" }))).toContain("`git diff origin/master...HEAD`");
+    const review = readFileSync(join(REPO_ROOT, "prompts", "review.md"), "utf8");
+    expect(renderPrompt(review, project({ defaultBranch: "master" }))).toContain("git diff origin/master...<commit under review>");
   });
 
   it("rejects an unknown placeholder", () => {

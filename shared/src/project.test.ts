@@ -10,14 +10,16 @@ describe("ProjectSchema", () => {
     expect(p.defaultBranch).toBe("main");
     expect(p.enabled).toBe(true);
     expect(p.lanes).toEqual({ build: true, qa: true, review: true });
-    expect(p.limits).toEqual({ maxTurns: 20, qaMaxTurns: 20 });
+    expect(p.limits).toEqual({ maxTurns: 20, qaMaxTurns: 20, reviewMaxTurns: 20 });
   });
 
   it("lets a project set the turn caps separately", () => {
     const p = parseProject({ ...base, limits: { maxTurns: 30 } }, file);
-    expect(p.limits).toEqual({ maxTurns: 30, qaMaxTurns: 20 });
+    expect(p.limits).toEqual({ maxTurns: 30, qaMaxTurns: 20, reviewMaxTurns: 20 });
     expect(parseProject({ ...base, limits: { qaMaxTurns: 5 } }, file).limits.qaMaxTurns).toBe(5);
+    expect(parseProject({ ...base, limits: { reviewMaxTurns: 9 } }, file).limits.reviewMaxTurns).toBe(9);
     expect(() => parseProject({ ...base, limits: { qaMaxTurns: 0 } }, file)).toThrow(/qaMaxTurns/);
+    expect(() => parseProject({ ...base, limits: { reviewMaxTurns: 0 } }, file)).toThrow(/reviewMaxTurns/);
   });
 
   it("flags a project without a test command", () => {

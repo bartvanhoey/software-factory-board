@@ -90,6 +90,11 @@ export function qaPromptPath(project: Project): string {
   return join(REPO_ROOT, project.prompts.qa ?? join("prompts", "qa.md"));
 }
 
+/** The review prompt file: the project's own override (relative to the repo root), else the default. */
+export function reviewPromptPath(project: Project): string {
+  return join(REPO_ROOT, project.prompts.review ?? join("prompts", "review.md"));
+}
+
 export const logDirFor = (settings: Settings, project: Project): string => join(settings.dataDir, "logs", project.name);
 export const lockDirFor = (settings: Settings, project: Project): string => join(settings.dataDir, "locks", `${project.name}.lock`);
 export const eventsFile = (settings: Settings): string => join(settings.dataDir, "events.jsonl");
