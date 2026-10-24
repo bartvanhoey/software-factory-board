@@ -62,7 +62,7 @@ issues and refuses a branch that already exists on `origin`. A rework path comes
 | agent logs | `$FACTORY_DATA/logs/<project>/issue-<n>.log`; for qa `qa-issue-<n>.log` (checks) and `qa-issue-<n>.agent.txt` (the agent's answer) |
 | events | `$FACTORY_DATA/events.jsonl` (schema: `shared/src/event.ts`) |
 | locks | `$FACTORY_DATA/locks/<project>.lock`, one run per project, stale locks are taken over |
-| prompt | `prompts/builder.md` and `prompts/qa.md`, or the project's `prompts.builder` / `prompts.qa`; `{{build_command}}`, `{{test_command}}` and `{{project_name}}` are filled in |
+| prompt | `prompts/builder.md` and `prompts/qa.md`, or the project's `prompts.builder` / `prompts.qa`; `{{build_command}}`, `{{test_command}}`, `{{default_branch}}` and `{{project_name}}` are filled in |
 
 ## Design
 
