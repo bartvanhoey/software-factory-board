@@ -48,6 +48,9 @@ export function dryRunGit(real: Git, print: (line: string) => void): Git {
     async deleteRemoteBranch(_cwd: string, branch: string) {
       print(fmt("deleteRemoteBranch", [branch]));
     },
+    async commitAll(_cwd: string, message: string) {
+      print(fmt("commitAll", [message.split("\n")[0]]));
+    },
     async push(_cwd: string, branch: string) {
       print(fmt("push", [branch]));
     },

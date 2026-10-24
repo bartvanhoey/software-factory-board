@@ -99,3 +99,51 @@ describe("gitCli worktrees and refs", () => {
     expect(await gitCli.commitsAhead(repo, "main")).toBe(1);
   });
 });
+
+describe("gitCli.commitAll and statusPaths", () => {
+  const bot = { name: "factory-bot", email: "42+factory-bot@users.noreply.github.com" };
+
+  it("commits new, changed and deleted files as the given identity, without any configured identity", async () => {
+    writeFileSync(join(repo, "a.txt"), "two\n");
+    writeFileSync(join(repo, "new file.txt"), "new\n");
+    mkdirSync(join(repo, "sub"));
+    writeFileSync(join(repo, "sub", "deep.txt"), "deep\n");
+    const head = git("rev-parse", "HEAD").trim();
+
+    await gitCli.commitAll(repo, "🤖 [build] #4: Add paging\n\nBody line.", bot);
+
+    expect(git("rev-parse", "HEAD~1").trim()).toBe(head); // exactly one new commit
+    expect(git("log", "-1", "--format=%an|%ae|%cn|%ce").trim()).toBe(`${bot.name}|${bot.email}|${bot.name}|${bot.email}`);
+    expect(git("log", "-1", "--format=%B").trim()).toBe("🤖 [build] #4: Add paging\n\nBody line.");
+    expect(git("show", "--name-only", "--format=").trim().split("\n").sort()).toEqual(["a.txt", "new file.txt", "sub/deep.txt"]);
+    expect(await gitCli.isClean(repo)).toBe(true);
+  });
+
+  it("leaves files out that .gitignore excludes", async () => {
+    writeFileSync(join(repo, ".gitignore"), "bin/\n");
+    mkdirSync(join(repo, "bin"));
+    writeFileSync(join(repo, "bin", "app.dll"), "binary");
+    writeFileSync(join(repo, "kept.txt"), "kept\n");
+
+    await gitCli.commitAll(repo, "msg", bot);
+
+    expect(git("show", "--name-only", "--format=").trim().split("\n").sort()).toEqual([".gitignore", "kept.txt"]);
+    expect(await gitCli.isClean(repo)).toBe(true);
+  });
+
+  it("fails, with git's message, when there is nothing to commit", async () => {
+    await expect(gitCli.commitAll(repo, "msg", bot)).rejects.toThrow(/failed \(exit 1\)/);
+  });
+
+  it("lists changed and untracked paths, one per file, a rename once, unquoted names with spaces", async () => {
+    expect(await gitCli.statusPaths(repo)).toEqual([]);
+    git("mv", "a.txt", "renamed file.txt");
+    mkdirSync(join(repo, "dir"));
+    writeFileSync(join(repo, "dir", "new file.txt"), "x\n");
+    writeFileSync(join(repo, "dir", "other.txt"), "y\n");
+
+    const paths = await gitCli.statusPaths(repo);
+
+    expect([...paths].sort()).toEqual(["dir/new file.txt", "dir/other.txt", "renamed file.txt"]);
+  });
+});

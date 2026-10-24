@@ -5,7 +5,7 @@ import { dryRunGh, dryRunGit } from "../dryRun.js";
 import { UsageError } from "../errors.js";
 import { createLabelEnsurer } from "../labels.js";
 import { FakeAgent, FakeEvents, FakeGh, FakeGit, FakeShell, type CallLog } from "../testing/fakes.js";
-import { runBuildLane, type BuildDeps, type BuildResult } from "./build.js";
+import { autoCommitMessage, runBuildLane, type BuildDeps, type BuildResult } from "./build.js";
 
 const TEMPLATE = "Build with {{build_command}}, test with {{test_command}}.";
 const WORKTREES = join("work", ".factory-worktrees", "demo");
@@ -239,6 +239,46 @@ describe("runBuildLane: failures keep the card in building", () => {
     expect(t.log).not.toContain("git.push issue-4");
   });
 
+  it("when the builder made no commit and left nothing to commit, without committing anything", async () => {
+    const t = setup();
+    t.gh.addIssue(4, ["ready"]);
+    t.git.ahead = 0;
+    expectFailed(t, await t.run(), /builder made no commit/);
+    expect(t.log).toContain("git.statusPaths");
+    expect(t.git.commits).toEqual([]);
+  });
+
+  it("when the builder left files that look like secrets, committing nothing", async () => {
+    const t = setup();
+    t.gh.addIssue(4, ["ready"]);
+    t.git.ahead = 0;
+    t.git.dirtyPaths = ["src/Program.cs", "config/.env", "keys/api.key"];
+    expectFailed(t, await t.run(), /look like secrets \(config\/\.env, keys\/api\.key\); nothing was committed/);
+    expect(t.git.commits).toEqual([]);
+    expect(t.log.some((l) => l.startsWith("git.commitAll") || l === "git.push issue-4")).toBe(false);
+  });
+
+  it("when the lane's own commit fails, such as a rejecting hook", async () => {
+    const t = setup();
+    t.gh.addIssue(4, ["ready"]);
+    t.git.ahead = 0;
+    t.git.dirtyPaths = ["a.cs"];
+    t.git.failOnce.set("commitAll", new Error("pre-commit hook rejected"));
+    expectFailed(t, await t.run(), /could not commit the builder's changes \(pre-commit hook rejected\)/);
+    expect(t.log).not.toContain("git.push issue-4");
+  });
+
+  it("when the builder committed but also left changes, without committing the leftovers", async () => {
+    const t = setup();
+    t.gh.addIssue(4, ["ready"]);
+    t.git.ahead = 1;
+    t.git.dirtyPaths = ["leftover.cs"];
+    expectFailed(t, await t.run(), /builder left uncommitted changes/);
+    expect(t.git.commits).toEqual([]);
+    expect(t.log).not.toContain("git.statusPaths");
+    expect(t.log).not.toContain("git.push issue-4");
+  });
+
   it("when the independent test run fails", async () => {
     const t = setup();
     t.gh.addIssue(4, ["ready"]);
@@ -278,6 +318,73 @@ describe("runBuildLane: failures keep the card in building", () => {
     const result = await t.run();
     expect(result.status).toBe("failed");
     expect(t.said.some((m) => m.includes("could not comment"))).toBe(true);
+  });
+});
+
+describe("runBuildLane: the builder left its changes uncommitted", () => {
+  const dirtySetup = () => {
+    const t = setup();
+    t.gh.addIssue(4, ["ready"], { title: "Add paging" });
+    t.git.ahead = 0;
+    t.git.dirtyPaths = ["EmployeeManagement.Web/wwwroot/css/site.css", "EmployeeManagement.Web/Pages/List.razor"];
+    return t;
+  };
+
+  it("commits the changes as the bot, then verifies, pushes and hands off, in order", async () => {
+    const t = dirtySetup();
+    const result = await t.run();
+
+    expect(result.status).toBe("done");
+    inOrder(t.log, "agent.run", "git.commitsAhead", "git.statusPaths", "git.commitAll", "git.isClean", "shell.run dotnet test x.sln", "git.push issue-4", "gh.editIssue 4 +[qa] -[building]");
+    expect(t.git.commits).toEqual([
+      {
+        message: "🤖 [build] #4: Add paging\n\nCommitted by the build lane: the builder left its changes uncommitted.",
+        identity: { name: "factory-bot", email: "42+factory-bot@users.noreply.github.com" },
+        paths: ["EmployeeManagement.Web/wwwroot/css/site.css", "EmployeeManagement.Web/Pages/List.razor"],
+      },
+    ]);
+    expect(t.events.types).toEqual(["started", "claimed", "agent_done", "autocommitted", "verified", "pushed", "handed_off"]);
+    expect(t.gh.comments[0]?.body).toContain("The lane committed the builder's changes itself");
+    expect(t.gh.issues.get(4)?.labels).toEqual(["qa"]);
+    expect(t.gh.prs).toEqual([]);
+  });
+
+  it("does not skip the independent verification: a failing test run after the lane's commit pushes nothing", async () => {
+    const t = dirtySetup();
+    t.shell.ok = false;
+    const result = await t.run();
+    expect(result).toMatchObject({ status: "failed", reason: "test failed on the branch" });
+    expect(t.git.commits).toHaveLength(1);
+    expect(t.log).not.toContain("git.push issue-4");
+    expect(t.gh.issues.get(4)?.labels).toEqual(["building"]);
+  });
+
+  it("does nothing extra when the builder committed by itself", async () => {
+    const t = setup();
+    t.gh.addIssue(4, ["ready"]);
+    await t.run();
+    expect(t.log).not.toContain("git.statusPaths");
+    expect(t.git.commits).toEqual([]);
+    expect(t.events.types).not.toContain("autocommitted");
+    expect(t.gh.comments[0]?.body).not.toContain("The lane committed");
+  });
+
+  it("keeps the subject on one line, at most 72 characters of title", () => {
+    expect(autoCommitMessage(7, "Short")).toBe("🤖 [build] #7: Short\n\nCommitted by the build lane: the builder left its changes uncommitted.");
+    const long = autoCommitMessage(7, `  First line\nsecond   line ${"x".repeat(100)}`);
+    const subject = long.split("\n")[0] ?? "";
+    expect(subject.startsWith("🤖 [build] #7: First line second line x")).toBe(true);
+    expect(subject.endsWith("…")).toBe(true);
+    expect(subject.slice("🤖 [build] #7: ".length)).toHaveLength(72);
+    expect(long.split("\n")).toHaveLength(3);
+  });
+
+  it("does not run in a dry run, where the agent is skipped", async () => {
+    const t = dirtySetup();
+    const deps: BuildDeps = { ...t.deps(), gh: dryRunGh(t.gh, () => {}), git: dryRunGit(t.git, () => {}) };
+    await t.run({ dryRun: true, deps });
+    expect(t.git.commits).toEqual([]);
+    expect(t.log).not.toContain("git.statusPaths");
   });
 });
 

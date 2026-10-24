@@ -112,6 +112,9 @@ export class FakeGit implements Git {
   localBranches = new Set<string>();
   ahead = 1;
   clean = true;
+  /** Changed paths in the worktree, as `statusPaths` reports them. `commitAll` clears them. */
+  dirtyPaths: string[] = [];
+  commits: { message: string; identity: { name: string; email: string }; paths: string[] }[] = [];
   origin = "https://github.com/o/r.git";
   /** What `rev-parse` returns, call by call; the last value repeats. */
   shas: string[] = ["a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0"];
@@ -186,7 +189,17 @@ export class FakeGit implements Git {
   }
   async isClean() {
     this.enter("isClean");
-    return this.clean;
+    return this.clean && this.dirtyPaths.length === 0;
+  }
+  async statusPaths() {
+    this.enter("statusPaths");
+    return [...this.dirtyPaths];
+  }
+  async commitAll(_cwd: string, message: string, identity: { name: string; email: string }) {
+    this.enter("commitAll");
+    this.commits.push({ message, identity, paths: [...this.dirtyPaths] });
+    this.dirtyPaths = [];
+    this.ahead += 1;
   }
   async push(_cwd: string, branch: string) {
     this.enter("push", branch);

@@ -36,6 +36,11 @@ docker compose exec runner npm run runner -- review --project <name> [--issue <n
 4. Creates a worktree `issue-<n>` from `origin/<defaultBranch>` and runs `claude -p` in it.
 5. Checks the result itself: at least one commit, a clean tree, then the project's `commands.test`
    (or `commands.build` when there are no tests, or nothing when there are neither).
+   If the builder made **no commit** but left changes, the lane commits them itself as the bot
+   (`🤖 [build] #<n>: <issue title>`, `git add -A`, hooks run) and still verifies. It refuses, and
+   commits nothing, when a changed file looks like a secret (`.env*` except `.env.example`, `*.pem`,
+   `*.key`, `*.pfx`, `*.p12`, `id_rsa*`). Leftover changes next to a commit the builder made stay a failure.
+   The issue comment says when the lane made the commit.
 6. Pushes the branch (no PR), moves the card to `qa`, and comments on the issue with the branch and a
    GitHub compare link (`<default>...issue-<n>`).
 

@@ -89,6 +89,31 @@ export const gitCli: Git = {
     return (await git(cwd, ["status", "--porcelain"])).trim() === "";
   },
 
+  async statusPaths(cwd) {
+    // -z: NUL-separated and never quoted. A rename or copy is followed by one extra entry, its old path.
+    const out = await git(cwd, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]);
+    const entries = out.split("\0").filter((e) => e.length > 0);
+    const paths: string[] = [];
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i] as string;
+      paths.push(entry.slice(3));
+      if (entry[0] === "R" || entry[0] === "C") i++;
+    }
+    return paths;
+  },
+
+  async commitAll(cwd, message, identity) {
+    const env = {
+      GIT_TERMINAL_PROMPT: "0",
+      GIT_AUTHOR_NAME: identity.name,
+      GIT_AUTHOR_EMAIL: identity.email,
+      GIT_COMMITTER_NAME: identity.name,
+      GIT_COMMITTER_EMAIL: identity.email,
+    };
+    await mustRun("git", ["-C", cwd, "add", "-A"], { env });
+    await mustRun("git", ["-C", cwd, "commit", "-q", "-m", message], { env });
+  },
+
   async push(cwd, branch) {
     await git(cwd, ["push", "-u", "origin", branch], true);
   },

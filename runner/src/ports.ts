@@ -59,6 +59,10 @@ export interface Git {
   deleteBranch(cwd: string, branch: string): Promise<void>;
   commitsAhead(cwd: string, base: string): Promise<number>;
   isClean(cwd: string): Promise<boolean>;
+  /** Paths with changes, untracked files included (a rename lists only its new path). */
+  statusPaths(cwd: string): Promise<string[]>;
+  /** `git add -A` then `git commit`, authored and committed as `identity`. Hooks run. */
+  commitAll(cwd: string, message: string, identity: { name: string; email: string }): Promise<void>;
   push(cwd: string, branch: string): Promise<void>;
 }
 
