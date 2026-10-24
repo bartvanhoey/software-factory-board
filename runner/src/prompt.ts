@@ -8,6 +8,7 @@ export function renderPrompt(template: string, project: Project): string {
     build_command: project.commands.build ?? NONE,
     test_command: project.commands.test ?? NONE,
     project_name: project.name,
+    default_branch: project.defaultBranch,
   };
   return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_match, key: string) => {
     const value = values[key];

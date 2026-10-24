@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { parseProject } from "@factory/shared";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { parseArgs } from "./cli.js";
-import { ensureClone, loadLocalConfig, loadSettings, resolveCloneDir, worktreeRoot, type Settings } from "./config.js";
+import { REPO_ROOT, ensureClone, loadLocalConfig, loadSettings, resolveCloneDir, worktreeRoot, type Settings } from "./config.js";
 import { UsageError } from "./errors.js";
 import { createEventLog } from "./events.js";
 import { acquireLock } from "./lock.js";
@@ -46,6 +46,27 @@ describe("renderPrompt / allowedToolsFor / verifyStep", () => {
   it("fills the placeholders and marks missing commands", () => {
     const p = project({ commands: { build: "make" } });
     expect(renderPrompt("b={{build_command}} t={{ test_command }} n={{project_name}}", p)).toBe("b=make t=(none configured) n=demo");
+  });
+
+  it("fills {{default_branch}} from the project, defaulting to main", () => {
+    expect(renderPrompt("origin/{{default_branch}}", project())).toBe("origin/main");
+    expect(renderPrompt("origin/{{ default_branch }}...HEAD", project({ defaultBranch: "master" }))).toBe("origin/master...HEAD");
+    expect(renderPrompt("origin/{{default_branch}}", project({ defaultBranch: "release/2026" }))).toBe("origin/release/2026");
+  });
+
+  it("renders the real prompt files, using the project's default branch and no hard-coded one", () => {
+    for (const name of ["builder.md", "qa.md"]) {
+      const template = readFileSync(join(REPO_ROOT, "prompts", name), "utf8");
+      for (const defaultBranch of ["main", "master", "develop"]) {
+        const text = renderPrompt(template, project({ defaultBranch, commands: { build: "make", test: "make test" } }));
+        expect(text, `${name} (${defaultBranch}) has an unfilled placeholder`).not.toMatch(/\{\{/);
+        for (const other of ["main", "master"].filter((b) => b !== defaultBranch)) {
+          expect(text, `${name} hard-codes origin/${other}`).not.toContain(`origin/${other}`);
+        }
+      }
+    }
+    const qa = readFileSync(join(REPO_ROOT, "prompts", "qa.md"), "utf8");
+    expect(renderPrompt(qa, project({ defaultBranch: "master" }))).toContain("`git diff origin/master...HEAD`");
   });
 
   it("rejects an unknown placeholder", () => {
