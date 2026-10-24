@@ -36,6 +36,9 @@ function keyPart(raw: string): string {
   return createHash("sha256").update(raw.trim().toLowerCase().slice(0, 254)).digest("hex").slice(0, 32);
 }
 
+/** The login throttle key for an email, so an admin password reset can clear it. */
+export const acctThrottleKey = (email: string): string => `login:acct:${keyPart(email)}`;
+
 const isDuplicateEmail = (err: unknown): boolean => err instanceof Error && /UNIQUE constraint failed: users\.email/.test(err.message);
 
 /**
@@ -74,7 +77,7 @@ export async function register(db: DatabaseSync, input: { email: string; passwor
 export async function login(db: DatabaseSync, input: { email: string; password: string }, ctx: Ctx): Promise<LoggedIn | Failure> {
   const now = ctx.now ?? Date.now();
   const email = normalizeEmail(input.email);
-  const acctKey = `login:acct:${keyPart(email ?? input.email)}`;
+  const acctKey = acctThrottleKey(email ?? input.email);
   const keys = [acctKey, ...(ctx.ip ? [`login:ip:${ctx.ip}`] : [])];
 
   const blocked = Math.max(...keys.map((k) => retryAfter(db, k, now)));
@@ -86,9 +89,11 @@ export async function login(db: DatabaseSync, input: { email: string; password: 
   const user = email ? findUserByEmail(db, email) : undefined;
   const valid = user ? await verifyPassword(input.password, user.password_hash) : (await verifyDummy(input.password), false);
 
-  if (!user || !valid || user.disabled_at !== null) {
+  // The hash above is slow. Re-read the row so a password reset or disable that landed meanwhile still wins.
+  const fresh = user && valid ? findUserById(db, user.id) : undefined;
+  if (!user || !valid || !fresh || fresh.password_hash !== user.password_hash || fresh.disabled_at !== null) {
     // Only real accounts are audited: the log is append-only, so unknown emails must not be able to grow it.
-    if (user) audit(db, { action: "login.failed", target: user.id, ip: ctx.ip, detail: { disabled: user.disabled_at !== null && valid } }, now);
+    if (user) audit(db, { action: "login.failed", target: user.id, ip: ctx.ip, detail: { disabled: (fresh ?? user).disabled_at !== null && valid } }, now);
     return { ok: false, error: GENERIC_LOGIN_ERROR };
   }
 
