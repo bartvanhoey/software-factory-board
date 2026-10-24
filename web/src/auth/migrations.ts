@@ -60,4 +60,19 @@ export const migrations: readonly Migration[] = [
         BEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END;
     `,
   },
+  {
+    version: 2,
+    name: "throttle, expiry indexes",
+    sql: `
+      -- Login backoff counters and registration windows. Key prefix says which: "login:..." counts
+      -- failures (updated_at = last failure), "register:..." is a fixed window (updated_at = window start).
+      CREATE TABLE throttle (
+        key TEXT PRIMARY KEY,
+        count INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      ) STRICT;
+      CREATE INDEX throttle_updated_at ON throttle (updated_at);
+      CREATE INDEX sessions_expires_at ON sessions (expires_at);
+    `,
+  },
 ];

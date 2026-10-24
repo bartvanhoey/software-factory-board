@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { migrate, openDb } from "./db";
+import { migrate, openDb, transaction } from "./db";
 import { migrations } from "./migrations";
 
 const dirs: string[] = [];
@@ -97,5 +97,24 @@ describe("schema constraints", () => {
     expect(() => db.exec("UPDATE audit_log SET action = 'x'")).toThrow(/append-only/);
     expect(() => db.exec("DELETE FROM audit_log")).toThrow(/append-only/);
     expect(db.prepare("SELECT COUNT(*) AS n FROM audit_log").get()).toEqual({ n: 1 });
+  });
+});
+
+describe("transaction", () => {
+  it("commits on success and rolls everything back on a throw", () => {
+    const db = openDb(":memory:");
+    expect(
+      transaction(db, () => {
+        addUser(db, "ok@example.com");
+        return 42;
+      }),
+    ).toBe(42);
+    expect(() =>
+      transaction(db, () => {
+        addUser(db, "gone@example.com");
+        throw new Error("nope");
+      }),
+    ).toThrow("nope");
+    expect(db.prepare("SELECT email FROM users").all()).toEqual([{ email: "ok@example.com" }]);
   });
 });

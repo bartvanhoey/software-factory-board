@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const config: NextConfig = {
+  poweredByHeader: false,
   // @factory/shared is TypeScript source in this monorepo.
   transpilePackages: ["@factory/shared"],
   webpack(cfg) {

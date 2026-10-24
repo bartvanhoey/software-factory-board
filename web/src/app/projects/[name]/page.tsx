@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { requireAccess } from "@/auth/dal";
 import { Board } from "@/components/Board";
 import { DemoBanner, Header } from "@/components/Header";
 import { loadBoard } from "@/lib/data";
@@ -7,6 +8,7 @@ import { loadBoard } from "@/lib/data";
 export const dynamic = "force-dynamic";
 
 export default async function ProjectPage({ params }: { params: Promise<{ name: string }> }) {
+  await requireAccess("viewer");
   const { name } = await params;
   const board = await loadBoard();
   const project = board.projects.find((p) => p.info.name === decodeURIComponent(name));
