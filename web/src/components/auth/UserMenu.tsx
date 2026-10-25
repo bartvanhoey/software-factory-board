@@ -1,14 +1,23 @@
 import Link from "next/link";
 import { logoutAction } from "@/auth/actions";
 import { getSession } from "@/auth/dal";
+import { getDb } from "@/auth/db";
+import { countPending, hasRole } from "@/auth/users";
 
 /** Who is logged in, with the password and logout actions. Renders nothing for visitors. */
 export async function UserMenu() {
   const session = await getSession();
   if (!session) return null;
+  const isAdmin = hasRole(session.roles, "admin");
+  const pending = isAdmin ? countPending(getDb()) : 0;
   return (
     <div className="flex items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400">
       <span>{session.email}</span>
+      {isAdmin && (
+        <Link href="/admin/users" className="hover:underline">
+          Admin{pending > 0 ? ` (${pending} pending)` : ""}
+        </Link>
+      )}
       <Link href="/account/password" className="hover:underline">
         Password
       </Link>

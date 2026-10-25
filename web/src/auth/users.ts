@@ -23,9 +23,11 @@ export function normalizeEmail(raw: string): string | null {
   return email.length <= 254 && EMAIL.test(email) ? email : null;
 }
 
-/** Admin implies every other role. */
+/** Admin implies every other role, and issue-admin implies viewer (it could not use a board it cannot see). */
 export function hasRole(roles: readonly Role[], needed: Role): boolean {
-  return roles.includes("admin") || roles.includes(needed);
+  if (roles.includes("admin")) return true;
+  if (needed === "viewer") return roles.includes("issue-admin") || roles.includes("viewer");
+  return roles.includes(needed);
 }
 
 export function findUserByEmail(db: DatabaseSync, email: string): UserRow | undefined {

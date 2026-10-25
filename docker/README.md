@@ -48,6 +48,13 @@ Windows folder is unreliable. Back up the volume, and keep `MFA_ENCRYPTION_KEY` 
 | `TRUST_PROXY` | no | `false` | `true` when a reverse proxy you control sets `X-Forwarded-For`; enables per-IP login and registration limits. Leave `false` otherwise: the header is spoofable, and logins are then throttled per account only. Only use `true` when the proxy is the sole way in; if port 2999 is also reachable directly, clients can forge the header and dodge the per-IP limits. |
 | `AUTH_DB_PATH` | no | `/auth/auth.db` | Set by compose. |
 
+Roles and administration: `admin` includes `issue-admin` and `viewer`, and `issue-admin` includes `viewer`. Admins use
+`/admin/users` to give accounts roles (a new account sees only the waiting page until then), disable or enable
+accounts, and reset passwords. A reset shows a temporary password once, forces a change at next login and ends that
+user's sessions. Admins cannot remove their own admin role, disable themselves or reset their own password, and at
+least one active admin must always remain. `/admin/audit` is a read-only, filterable log of who did what. Users are
+disabled, never deleted. Role changes take effect on the next request; they do not end sessions.
+
 Login, registration, the waiting page (for accounts without a role) and password change are live. The first admin
 comes from `ADMIN_EMAIL` and `ADMIN_PASSWORD` and must change its password at first login. Public routes are
 `/login`, `/register` and `/api/health` (the container healthcheck, which answers only `ok` or an error); everything

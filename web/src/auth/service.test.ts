@@ -103,6 +103,13 @@ describe("login", () => {
     expect((await login(db, { email: "user@example.com", password: PW }, ctx({ ip: "4.4.4.4" }))).ok).toBe(true);
   });
 
+  it("does not let a login that was hashing survive a password reset that landed meanwhile", async () => {
+    const inFlight = login(db, { email: "user@example.com", password: PW }, ctx()); // reads the row, then waits on scrypt
+    db.prepare("UPDATE users SET password_hash = 'scrypt$1024$8$1$aa$bb' WHERE email = 'user@example.com'").run();
+    expect(await inFlight).toEqual({ ok: false, error: "Wrong email or password." });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM sessions").get()).toEqual({ n: 1 }); // only the registration session
+  });
+
   it("refuses a disabled account with the generic error", async () => {
     db.prepare("UPDATE users SET disabled_at = ? WHERE email = 'user@example.com'").run(T0);
     expect(await login(db, { email: "user@example.com", password: PW }, ctx())).toEqual({ ok: false, error: "Wrong email or password." });

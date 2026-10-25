@@ -51,5 +51,5 @@ export function proxyDecision(pathname: string, hasSessionCookie: boolean): Prox
 
 /** Pages that show or handle credentials must never be cached. */
 export function isNoStorePath(pathname: string): boolean {
-  return pathname === "/login" || pathname === "/register" || pathname === "/waiting" || pathname.startsWith("/account/");
+  return pathname === "/login" || pathname === "/register" || pathname === "/waiting" || pathname.startsWith("/account/") || pathname.startsWith("/admin/");
 }

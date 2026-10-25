@@ -31,11 +31,14 @@ export async function requireUser(): Promise<SessionInfo> {
  * The check every protected page and action calls, close to the data (layouts do not re-render on
  * navigation, so a layout check is not enough). Sends users to the screen their state requires.
  */
-export async function requireAccess(role: Role = "viewer"): Promise<SessionInfo> {
+export async function requireAccess(role: Role = "viewer", onDenied?: (session: SessionInfo) => void | Promise<void>): Promise<SessionInfo> {
   const session = await requireUser();
   const gate = gateRedirect(session);
   if (gate) redirect(gate);
-  if (!hasRole(session.roles, role)) notFound();
+  if (!hasRole(session.roles, role)) {
+    await onDenied?.(session);
+    notFound();
+  }
   return session;
 }
 

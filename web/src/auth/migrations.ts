@@ -75,4 +75,12 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX sessions_expires_at ON sessions (expires_at);
     `,
   },
+  {
+    version: 3,
+    name: "audit action index",
+    sql: `
+      -- The audit screen lists the distinct actions on every load; the log only ever grows.
+      CREATE INDEX audit_log_action ON audit_log (action);
+    `,
+  },
 ];
