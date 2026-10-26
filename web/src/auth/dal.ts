@@ -20,10 +20,30 @@ export const getSession = cache(async (): Promise<SessionInfo | null> => {
   return token ? validateSession(getDb(), token) : null;
 });
 
-/** Any logged-in user, whatever state they are in. For the pages gating sends people to. */
+/**
+ * Any logged-in user, whatever state they are in, except one who has only passed the password: that session grants
+ * nothing until the code is entered. For the pages gating sends people to.
+ */
 export async function requireUser(): Promise<SessionInfo> {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.mfaPending) redirect("/login/mfa");
+  return session;
+}
+
+/** The one page a pending session belongs on. Anyone else is sent to the board (and from there to their own state). */
+export async function requirePendingMfa(): Promise<SessionInfo> {
+  const session = await getSession();
+  if (!session) redirect("/login");
+  if (!session.mfaPending) redirect("/");
+  return session;
+}
+
+/** A page that belongs to one gating state (for example MFA setup): anyone in a different state is sent to theirs. */
+export async function requireState(page: string): Promise<SessionInfo> {
+  const session = await requireUser();
+  const gate = gateRedirect(session);
+  if (gate && gate !== page) redirect(gate);
   return session;
 }
 

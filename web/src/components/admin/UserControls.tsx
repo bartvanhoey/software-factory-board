@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { resetPasswordAction, saveRolesAction, setDisabledAction, type AdminState } from "@/auth/admin-actions";
+import { resetMfaAction, resetPasswordAction, saveRolesAction, setDisabledAction, setMfaRequiredAction, type AdminState } from "@/auth/admin-actions";
 
 const ROLES = ["admin", "issue-admin", "viewer"] as const;
 const HIDE_AFTER_MS = 60_000;
@@ -49,16 +49,23 @@ export function UserControls({
   roles,
   disabled,
   isSelf,
+  mfaEnabled,
+  mfaRequired,
 }: {
   id: string;
   email: string;
   roles: string[];
   disabled: boolean;
   isSelf: boolean;
+  mfaEnabled: boolean;
+  mfaRequired: boolean;
 }) {
   const [rolesState, rolesAction, rolesPending] = useActionState(saveRolesAction, {});
   const [disableState, disableAction, disablePending] = useActionState(setDisabledAction, {});
   const [resetState, resetAction, resetPending] = useActionState(resetPasswordAction, {});
+  const [requireState, requireAction, requirePending] = useActionState(setMfaRequiredAction, {});
+  const [resetMfaState, resetMfaFormAction, resetMfaPending] = useActionState(resetMfaAction, {});
+  const isAdmin = roles.includes("admin");
 
   return (
     <div className="space-y-2">
@@ -105,6 +112,29 @@ export function UserControls({
             </button>
             <Feedback state={resetState} />
           </form>
+          {isAdmin ? (
+            <p className="basis-full text-xs text-zinc-500 dark:text-zinc-400">MFA is always required for admins. Only the server&apos;s break-glass command can reset an admin&apos;s MFA.</p>
+          ) : (
+            <>
+              <form action={requireAction}>
+                <input type="hidden" name="userId" value={id} />
+                <input type="hidden" name="required" value={mfaRequired ? "false" : "true"} />
+                <button type="submit" disabled={requirePending} className={button}>
+                  {mfaRequired ? "Stop requiring MFA" : "Require MFA"}
+                </button>
+                <Feedback state={requireState} />
+              </form>
+              {mfaEnabled && (
+                <form action={resetMfaFormAction}>
+                  <input type="hidden" name="userId" value={id} />
+                  <button type="submit" disabled={resetMfaPending} className={button}>
+                    Reset MFA
+                  </button>
+                  <Feedback state={resetMfaState} />
+                </form>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>

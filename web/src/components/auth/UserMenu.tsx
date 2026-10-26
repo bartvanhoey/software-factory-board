@@ -7,7 +7,7 @@ import { countPending, hasRole } from "@/auth/users";
 /** Who is logged in, with the password and logout actions. Renders nothing for visitors. */
 export async function UserMenu() {
   const session = await getSession();
-  if (!session) return null;
+  if (!session || session.mfaPending) return null;
   const isAdmin = hasRole(session.roles, "admin");
   const pending = isAdmin ? countPending(getDb()) : 0;
   return (
@@ -18,6 +18,9 @@ export async function UserMenu() {
           Admin{pending > 0 ? ` (${pending} pending)` : ""}
         </Link>
       )}
+      <Link href="/account/mfa" className="hover:underline">
+        MFA
+      </Link>
       <Link href="/account/password" className="hover:underline">
         Password
       </Link>

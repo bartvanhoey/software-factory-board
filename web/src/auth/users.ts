@@ -13,6 +13,9 @@ export interface UserRow {
   email_verified_at: number | null;
   must_change_password: number;
   mfa_required: number;
+  mfa_secret_enc: string | null;
+  mfa_enabled_at: number | null;
+  mfa_last_step: number;
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

@@ -77,6 +77,15 @@ describe("gateRedirect", () => {
     expect(gateRedirect({ mustChangePassword: false, roles: [] })).toBe("/waiting");
     expect(gateRedirect({ mustChangePassword: false, roles: ["viewer"] })).toBeNull();
   });
+
+  it("puts the second factor first, then the password change, then MFA setup, then the waiting page", () => {
+    const all = { mustChangePassword: true, roles: [] as never[], mfaPending: true, needsMfaSetup: true };
+    expect(gateRedirect(all)).toBe("/login/mfa");
+    expect(gateRedirect({ ...all, mfaPending: false })).toBe("/account/password");
+    expect(gateRedirect({ ...all, mfaPending: false, mustChangePassword: false })).toBe("/account/mfa/setup");
+    expect(gateRedirect({ ...all, mfaPending: false, mustChangePassword: false, needsMfaSetup: false })).toBe("/waiting");
+    expect(gateRedirect({ mustChangePassword: false, roles: ["viewer"], needsMfaSetup: true })).toBe("/account/mfa/setup");
+  });
 });
 
 describe("request helpers", () => {

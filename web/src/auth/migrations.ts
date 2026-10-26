@@ -83,4 +83,33 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX audit_log_action ON audit_log (action);
     `,
   },
+  {
+    version: 4,
+    name: "mfa",
+    sql: `
+      -- mfa_secret_enc is AES-GCM (see mfa-crypto.ts). mfa_last_step is the newest TOTP step already accepted,
+      -- so a code cannot be used twice.
+      ALTER TABLE users ADD COLUMN mfa_secret_enc TEXT;
+      ALTER TABLE users ADD COLUMN mfa_enabled_at INTEGER;
+      ALTER TABLE users ADD COLUMN mfa_last_step INTEGER NOT NULL DEFAULT 0;
+
+      -- A secret waiting for its first correct code. The live secret is never replaced before that, so a
+      -- failed re-enrolment cannot lock anyone out. session_hash ties it to the session that asked for it: another
+      -- session of the same user can neither read it nor confirm it.
+      CREATE TABLE mfa_setup (
+        user_id TEXT PRIMARY KEY REFERENCES users (id),
+        secret_enc TEXT NOT NULL,
+        session_hash TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      ) STRICT;
+
+      CREATE TABLE recovery_codes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL REFERENCES users (id),
+        code_hash TEXT NOT NULL UNIQUE,
+        used_at INTEGER
+      ) STRICT;
+      CREATE INDEX recovery_codes_user_id ON recovery_codes (user_id);
+    `,
+  },
 ];

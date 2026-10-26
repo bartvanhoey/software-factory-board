@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { clearSessionCookie, readToken, requestContext, setSessionCookie } from "./dal";
+import { clearSessionCookie, readToken, requestContext, requireUser, setSessionCookie } from "./dal";
 import { getDb } from "./db";
 import { changePassword, login, logout, register } from "./service";
 import { deleteSession } from "./sessions";
@@ -53,6 +53,7 @@ export async function logoutAction(): Promise<void> {
 
 export async function changePasswordAction(_prev: FormState, form: FormData): Promise<FormState> {
   if (field(form, "next") !== field(form, "confirm")) return { error: "The two new passwords do not match." };
+  await requireUser(); // refuses a session that has not passed the second factor
   const token = await readToken();
   if (!token) redirect("/login");
   const result = await changePassword(getDb(), token, { current: field(form, "current"), next: field(form, "next") }, await requestContext());

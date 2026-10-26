@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { openDb } from "./db";
-import { createSession, deleteSession, hashToken, LIMITS, purgeExpired, revokeSessions, validateSession } from "./sessions";
+import { createSession, deleteSession, hashToken, LIMITS, markMfaVerified, MFA_PENDING_LIMIT, purgeExpired, revokeSessions, validateSession } from "./sessions";
 import { createUser, grantRole } from "./users";
 
 let db: ReturnType<typeof openDb>;
@@ -72,6 +72,44 @@ describe("sessions", () => {
     expect(validateSession(db, token, T0 + LIMITS.admin.absolute + 1000)).toBeNull();
   });
 
+  it("starts pending when asked, and only a code can change that", () => {
+    const { token } = createSession(db, user, { mfaPending: true }, T0);
+    const s = validateSession(db, token, T0)!;
+    expect(s.mfaPending).toBe(true);
+    expect(markMfaVerified(db, "wrong-hash", user)).toBe(false);
+    expect(markMfaVerified(db, s.tokenHash, admin)).toBe(false); // someone else's session
+    expect(markMfaVerified(db, s.tokenHash, user)).toBe(true);
+    expect(validateSession(db, token, T0)!.mfaPending).toBe(false);
+    expect(markMfaVerified(db, s.tokenHash, user)).toBe(false); // no longer pending
+  });
+
+  it("gives a pending session only five minutes", () => {
+    const { token } = createSession(db, user, { mfaPending: true }, T0);
+    expect(validateSession(db, token, T0 + MFA_PENDING_LIMIT - 1000)).not.toBeNull();
+    expect(validateSession(db, token, T0 + MFA_PENDING_LIMIT)).toBeNull();
+    // a full session is not affected
+    const full = createSession(db, user, {}, T0).token;
+    expect(validateSession(db, full, T0 + MFA_PENDING_LIMIT + 1000)).not.toBeNull();
+  });
+
+  it("says when MFA is required and not set up: always for admins, for others only when the flag is on", () => {
+    const u = validateSession(db, createSession(db, user, {}, T0).token, T0)!;
+    expect(u).toMatchObject({ mfaRequired: false, mfaEnabled: false, needsMfaSetup: false });
+    db.prepare("UPDATE users SET mfa_required = 1 WHERE id = ?").run(user);
+    expect(validateSession(db, createSession(db, user, {}, T0).token, T0)).toMatchObject({ mfaRequired: true, needsMfaSetup: true });
+    const a = validateSession(db, createSession(db, admin, {}, T0).token, T0)!;
+    expect(a).toMatchObject({ mfaRequired: true, needsMfaSetup: true });
+    db.prepare("UPDATE users SET mfa_enabled_at = ? WHERE id = ?").run(T0, admin);
+    expect(validateSession(db, createSession(db, admin, {}, T0).token, T0)).toMatchObject({ mfaEnabled: true, needsMfaSetup: false });
+  });
+
+  it("applies a newly set MFA requirement to a session that already exists", () => {
+    const { token } = createSession(db, user, {}, T0);
+    expect(validateSession(db, token, T0)!.needsMfaSetup).toBe(false);
+    db.prepare("UPDATE users SET mfa_required = 1 WHERE id = ?").run(user);
+    expect(validateSession(db, token, T0 + 1000)!.needsMfaSetup).toBe(true);
+  });
+
   it("touches last_seen at most once a minute", () => {
     const { token } = createSession(db, user, {}, T0);
     const seen = () => (db.prepare("SELECT last_seen_at AS t FROM sessions").get() as { t: number }).t;
@@ -99,6 +137,15 @@ describe("sessions", () => {
     expect(validateSession(db, c, T0)).toBeNull();
     revokeSessions(db, user);
     expect(validateSession(db, b, T0)).toBeNull();
+  });
+
+  it("sweeps pending sessions that were never completed, but not recent ones or full ones", () => {
+    createSession(db, user, { mfaPending: true }, T0);
+    createSession(db, user, {}, T0);
+    createSession(db, user, { mfaPending: true }, T0 + MFA_PENDING_LIMIT);
+    purgeExpired(db, T0 + MFA_PENDING_LIMIT);
+    const left = db.prepare("SELECT mfa_pending AS p, created_at AS c FROM sessions ORDER BY created_at").all();
+    expect(left).toEqual([{ p: 0, c: T0 }, { p: 1, c: T0 + MFA_PENDING_LIMIT }]);
   });
 
   it("purges expired sessions", () => {

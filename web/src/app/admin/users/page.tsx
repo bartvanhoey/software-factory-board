@@ -32,6 +32,7 @@ export default async function UsersPage() {
             <tr>
               <th scope="col" className="py-2 pr-4">Account</th>
               <th scope="col" className="py-2 pr-4">Status</th>
+              <th scope="col" className="py-2 pr-4">MFA</th>
               <th scope="col" className="py-2 pr-4">Created</th>
               <th scope="col" className="py-2">Roles and actions</th>
             </tr>
@@ -43,9 +44,21 @@ export default async function UsersPage() {
                 <td className="py-3 pr-4">
                   <span className={`rounded px-2 py-0.5 text-xs ${statusStyle[u.status]}`}>{u.status}</span>
                 </td>
+                <td className="py-3 pr-4 text-zinc-600 dark:text-zinc-400">
+                  {u.mfaEnabled ? "on" : "off"}
+                  {u.mfaRequired || u.roles.includes("admin") ? " · required" : ""}
+                </td>
                 <td className="py-3 pr-4 text-zinc-600 dark:text-zinc-400">{day(u.createdAt)}</td>
                 <td className="py-3">
-                  <UserControls id={u.id} email={u.email} roles={u.roles} disabled={u.status === "disabled"} isSelf={u.id === admin.userId} />
+                  <UserControls
+                    id={u.id}
+                    email={u.email}
+                    roles={u.roles}
+                    disabled={u.status === "disabled"}
+                    isSelf={u.id === admin.userId}
+                    mfaEnabled={u.mfaEnabled}
+                    mfaRequired={u.mfaRequired}
+                  />
                 </td>
               </tr>
             ))}
