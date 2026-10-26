@@ -1,7 +1,14 @@
 @import "tailwindcss";
 
+/* Dark mode follows the `dark` class on <html>, set by ThemeToggle / the inline script in layout.tsx. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
+}
+
+:root.dark {
+  color-scheme: dark;
 }
 
 body {

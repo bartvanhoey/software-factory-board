@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { BoardData } from "@/lib/types";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function Header({ board, title = "Software Factory Board" }: { board: BoardData; title?: string }) {
   const time = new Date(board.fetchedAt).toLocaleTimeString("en-GB", { timeZone: "UTC" });
@@ -8,9 +9,12 @@ export function Header({ board, title = "Software Factory Board" }: { board: Boa
       <h1 className="text-xl font-semibold tracking-tight">
         <Link href="/">{title}</Link>
       </h1>
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
-        {board.source === "live" ? "Live from GitHub" : "Demo data"} · updated {time} UTC · refreshes every 30 s
-      </p>
+      <div className="flex items-center gap-3">
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          {board.source === "live" ? "Live from GitHub" : "Demo data"} · updated {time} UTC · refreshes every 30 s
+        </p>
+        <ThemeToggle />
+      </div>
     </header>
   );
 }
