@@ -58,8 +58,21 @@ services:
       GH_TOKEN: ${WEB_GH_TOKEN:-}
       FACTORY_DEMO: ${FACTORY_DEMO:-}
       FACTORY_PROJECTS_DIR: /app/projects
+      # Auth settings are listed one by one, not via env_file: web must not see the runner's secrets.
+      AUTH_DB_PATH: /auth/auth.db
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
+      EMAIL_VERIFICATION: ${EMAIL_VERIFICATION:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
+      TRUST_PROXY: ${TRUST_PROXY:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
 
-    # Localhost only: the dashboard has no login. Use "2999:2999" to expose it on the LAN.
+    # Localhost only: logins travel over plain http. Exposing it (for example "2999:2999") needs a TLS proxy in front.
     ports:
       - "127.0.0.1:2999:2999"
 
@@ -74,9 +87,11 @@ services:
 
     volumes:
       - ./projects:/app/projects:ro
+      # Users, sessions and the audit log. Named volume, never a bind mount (SQLite locking on Windows).
+      - auth:/auth
 
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:2999/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:2999/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       start_period: 15s
@@ -86,3 +101,4 @@ volumes:
   workspace:
   data:
   cache:
+  auth:

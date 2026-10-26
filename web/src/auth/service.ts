@@ -1,0 +1,176 @@
+// No "server-only" or next/* imports: this is the testable core. Server actions only add cookies and redirects.
+import { createHash } from "node:crypto";
+import type { DatabaseSync } from "node:sqlite";
+import { audit } from "./audit";
+import { transaction } from "./db";
+import { hashPassword, needsRehash, verifyDummy, verifyPassword } from "./password";
+import { checkPassword } from "./policy";
+import { createSession, deleteSession, purgeExpired, revokeSessions, validateSession } from "./sessions";
+import { consume, recordFailure, releaseFailure, resetFailures, retryAfter } from "./throttle";
+import { countAdmins, countPending, createUser, findUserByEmail, findUserById, grantRole, normalizeEmail } from "./users";
+
+export interface Ctx {
+  /** Null unless TRUST_PROXY is on; see request.ts. */
+  ip: string | null;
+  userAgent: string | null;
+  now?: number;
+}
+
+export type Failure = { ok: false; error: string };
+export type LoggedIn = { ok: true; token: string; expiresAt: number };
+
+const HOUR = 3_600_000;
+const REGISTER_PER_IP = 5;
+const REGISTER_GLOBAL = 20;
+const PENDING_CAP = 100;
+const GENERIC_LOGIN_ERROR = "Wrong email or password.";
+const EXISTS = "An account with this email already exists.";
+
+function wait(ms: number): string {
+  const minutes = Math.ceil(ms / 60_000);
+  return `Too many attempts. Try again in ${minutes <= 1 ? "a minute" : `${minutes} minutes`}.`;
+}
+
+/** The throttle table is keyed by unauthenticated input, which may be a password typed into the wrong box. Never store it raw. */
+function keyPart(raw: string): string {
+  return createHash("sha256").update(raw.trim().toLowerCase().slice(0, 254)).digest("hex").slice(0, 32);
+}
+
+/** The login throttle key for an email, so an admin password reset can clear it. */
+export const acctThrottleKey = (email: string): string => `login:acct:${keyPart(email)}`;
+
+const isDuplicateEmail = (err: unknown): boolean => err instanceof Error && /UNIQUE constraint failed: users\.email/.test(err.message);
+
+/**
+ * Registration limits are a deliberate trade-off: without a trusted proxy there is only a global bucket, so a
+ * determined attacker can use it up. Only well-formed attempts count, so plain junk cannot.
+ */
+export async function register(db: DatabaseSync, input: { email: string; password: string }, ctx: Ctx): Promise<LoggedIn | Failure> {
+  const now = ctx.now ?? Date.now();
+  const email = normalizeEmail(input.email);
+  if (!email) return { ok: false, error: "Enter a valid email address." };
+  const policy = checkPassword(input.password, email);
+  if (policy) return { ok: false, error: policy };
+  if (countPending(db) >= PENDING_CAP) return { ok: false, error: "Registration is temporarily closed." };
+
+  const allowed = ctx.ip
+    ? consume(db, `register:ip:${ctx.ip}`, REGISTER_PER_IP, HOUR, now)
+    : consume(db, "register:global", REGISTER_GLOBAL, HOUR, now);
+  if (!allowed) return { ok: false, error: "Too many registrations. Try again later." };
+
+  // Hash first: the check, the inserts and the session then run with no await in between, so two
+  // simultaneous registrations for one email cannot both pass the check.
+  const passwordHash = await hashPassword(input.password);
+  try {
+    return transaction(db, (): LoggedIn | Failure => {
+      if (findUserByEmail(db, email)) return { ok: false, error: EXISTS };
+      const id = createUser(db, { email, passwordHash }, now);
+      audit(db, { action: "user.registered", actor: id, target: id, ip: ctx.ip }, now);
+      return { ok: true, ...createSession(db, id, ctx, now) };
+    });
+  } catch (err) {
+    if (isDuplicateEmail(err)) return { ok: false, error: EXISTS }; // another process won the race
+    throw err;
+  }
+}
+
+export async function login(db: DatabaseSync, input: { email: string; password: string }, ctx: Ctx): Promise<LoggedIn | Failure> {
+  const now = ctx.now ?? Date.now();
+  const email = normalizeEmail(input.email);
+  const acctKey = acctThrottleKey(email ?? input.email);
+  const keys = [acctKey, ...(ctx.ip ? [`login:ip:${ctx.ip}`] : [])];
+
+  const blocked = Math.max(...keys.map((k) => retryAfter(db, k, now)));
+  if (blocked > 0) return { ok: false, error: wait(blocked) };
+  // Count this attempt now, before the slow hash, so a burst of concurrent guesses cannot all pass the
+  // check above while the count is still zero. It is taken back on success.
+  for (const k of keys) recordFailure(db, k, now);
+
+  const user = email ? findUserByEmail(db, email) : undefined;
+  const valid = user ? await verifyPassword(input.password, user.password_hash) : (await verifyDummy(input.password), false);
+
+  // The hash above is slow. Re-read the row so a password reset or disable that landed meanwhile still wins.
+  const fresh = user && valid ? findUserById(db, user.id) : undefined;
+  if (!user || !valid || !fresh || fresh.password_hash !== user.password_hash || fresh.disabled_at !== null) {
+    // Only real accounts are audited: the log is append-only, so unknown emails must not be able to grow it.
+    if (user) audit(db, { action: "login.failed", target: user.id, ip: ctx.ip, detail: { disabled: (fresh ?? user).disabled_at !== null && valid } }, now);
+    return { ok: false, error: GENERIC_LOGIN_ERROR };
+  }
+
+  resetFailures(db, acctKey);
+  for (const k of keys.slice(1)) releaseFailure(db, k);
+  if (needsRehash(user.password_hash)) {
+    db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(await hashPassword(input.password), user.id);
+  }
+  purgeExpired(db, now);
+  audit(db, { action: "login.success", actor: user.id, target: user.id, ip: ctx.ip }, now);
+  return { ok: true, ...createSession(db, user.id, ctx, now) };
+}
+
+export function logout(db: DatabaseSync, token: string, ctx: Ctx): void {
+  const now = ctx.now ?? Date.now();
+  const session = validateSession(db, token, now);
+  deleteSession(db, token);
+  if (session) audit(db, { action: "logout", actor: session.userId, target: session.userId, ip: ctx.ip }, now);
+}
+
+export async function changePassword(
+  db: DatabaseSync,
+  token: string,
+  input: { current: string; next: string },
+  ctx: Ctx,
+): Promise<{ ok: true } | Failure> {
+  const now = ctx.now ?? Date.now();
+  const session = validateSession(db, token, now);
+  if (!session) return { ok: false, error: "Your session has ended. Log in again." };
+  const user = findUserById(db, session.userId)!;
+
+  const key = `login:chpw:${user.id}`;
+  const blocked = retryAfter(db, key, now);
+  if (blocked > 0) return { ok: false, error: wait(blocked) };
+  recordFailure(db, key, now); // counted before the slow check, like login; cleared on success
+  if (!(await verifyPassword(input.current, user.password_hash))) {
+    audit(db, { action: "password.change_failed", actor: user.id, target: user.id, ip: ctx.ip }, now);
+    return { ok: false, error: "The current password is wrong." };
+  }
+  resetFailures(db, key);
+
+  const policy = checkPassword(input.next, user.email);
+  if (policy) return { ok: false, error: policy };
+  // Hashing normalises (NFKC), so compare the same way or look-alike passwords slip through.
+  if (input.next.normalize("NFKC") === input.current.normalize("NFKC")) return { ok: false, error: "Choose a password different from the current one." };
+
+  const newHash = await hashPassword(input.next);
+  transaction(db, () => {
+    db.prepare("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?").run(newHash, user.id);
+    revokeSessions(db, user.id, session.tokenHash);
+    audit(db, { action: "password.changed", actor: user.id, target: user.id, ip: ctx.ip }, now);
+  });
+  return { ok: true };
+}
+
+export type SeedResult = "seeded" | "no-config" | "admin-exists" | "email-taken";
+
+/**
+ * Creates the first admin from ADMIN_EMAIL/ADMIN_PASSWORD, only when no admin exists. It never touches an
+ * existing account. Remove ADMIN_PASSWORD from .env after the first start: while no admin exists (for example
+ * after the only one was deleted) the variable would create one again.
+ */
+export async function seedAdmin(db: DatabaseSync, admin: { email: string; password: string } | null, now = Date.now()): Promise<SeedResult> {
+  if (!admin) return "no-config";
+  if (countAdmins(db) > 0) return "admin-exists";
+  if (findUserByEmail(db, admin.email)) return "email-taken";
+  const problem = checkPassword(admin.password, admin.email);
+  if (problem) throw new Error(`ADMIN_PASSWORD rejected: ${problem}`);
+
+  const passwordHash = await hashPassword(admin.password);
+  // One transaction: a crash between the user and the role would leave an account that blocks reseeding.
+  return transaction(db, (): SeedResult => {
+    if (countAdmins(db) > 0) return "admin-exists";
+    if (findUserByEmail(db, admin.email)) return "email-taken";
+    const id = createUser(db, { email: admin.email, passwordHash, mustChangePassword: true, verified: true }, now);
+    grantRole(db, id, "admin", null, now);
+    audit(db, { action: "admin.seeded", target: id }, now);
+    return "seeded";
+  });
+}
