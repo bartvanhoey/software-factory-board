@@ -57,7 +57,8 @@ export function loadAuthConfig(env: Env = process.env): AuthConfig {
   if (!rawKey) problems.push("MFA_ENCRYPTION_KEY is required (32 random bytes, base64)");
   else {
     const key = BASE64.test(rawKey) ? Buffer.from(rawKey, "base64") : null;
-    if (key?.length === 32) mfaKey = key;
+    if (key?.length === 32 && key.every((b) => b === key[0])) problems.push("MFA_ENCRYPTION_KEY must be random bytes, not one byte repeated");
+    else if (key?.length === 32) mfaKey = key;
     else problems.push("MFA_ENCRYPTION_KEY must be base64 that decodes to exactly 32 bytes");
   }
 

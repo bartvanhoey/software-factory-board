@@ -36,6 +36,8 @@ function keyPart(raw: string): string {
   return createHash("sha256").update(raw.trim().toLowerCase().slice(0, 254)).digest("hex").slice(0, 32);
 }
 
+export const waitMessage = wait;
+
 /** The login throttle key for an email, so an admin password reset can clear it. */
 export const acctThrottleKey = (email: string): string => `login:acct:${keyPart(email)}`;
 
@@ -89,7 +91,11 @@ export async function login(db: DatabaseSync, input: { email: string; password: 
   const user = email ? findUserByEmail(db, email) : undefined;
   const valid = user ? await verifyPassword(input.password, user.password_hash) : (await verifyDummy(input.password), false);
 
-  // The hash above is slow. Re-read the row so a password reset or disable that landed meanwhile still wins.
+  // Rehashing is slow too, so do it before the last read: from there to the new session there must be no await,
+  // or MFA could be switched on in between and the session would be created without the second factor.
+  const rehash = user && valid && needsRehash(user.password_hash) ? await hashPassword(input.password) : null;
+
+  // The hashes above are slow. Re-read the row so a password reset or disable that landed meanwhile still wins.
   const fresh = user && valid ? findUserById(db, user.id) : undefined;
   if (!user || !valid || !fresh || fresh.password_hash !== user.password_hash || fresh.disabled_at !== null) {
     // Only real accounts are audited: the log is append-only, so unknown emails must not be able to grow it.
@@ -99,12 +105,11 @@ export async function login(db: DatabaseSync, input: { email: string; password: 
 
   resetFailures(db, acctKey);
   for (const k of keys.slice(1)) releaseFailure(db, k);
-  if (needsRehash(user.password_hash)) {
-    db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(await hashPassword(input.password), user.id);
-  }
+  if (rehash) db.prepare("UPDATE users SET password_hash = ? WHERE id = ? AND password_hash = ?").run(rehash, user.id, user.password_hash);
   purgeExpired(db, now);
   audit(db, { action: "login.success", actor: user.id, target: user.id, ip: ctx.ip }, now);
-  return { ok: true, ...createSession(db, user.id, ctx, now) };
+  // With MFA the session starts pending: it proves the password only and grants nothing until the code is entered.
+  return { ok: true, ...createSession(db, user.id, { ...ctx, mfaPending: fresh.mfa_enabled_at !== null }, now) };
 }
 
 export function logout(db: DatabaseSync, token: string, ctx: Ctx): void {
@@ -122,7 +127,8 @@ export async function changePassword(
 ): Promise<{ ok: true } | Failure> {
   const now = ctx.now ?? Date.now();
   const session = validateSession(db, token, now);
-  if (!session) return { ok: false, error: "Your session has ended. Log in again." };
+  // A session that has only passed the password grants nothing, or the second factor would protect nothing.
+  if (!session || session.mfaPending) return { ok: false, error: "Your session has ended. Log in again." };
   const user = findUserById(db, session.userId)!;
 
   const key = `login:chpw:${user.id}`;

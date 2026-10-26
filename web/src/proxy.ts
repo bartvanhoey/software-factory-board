@@ -20,8 +20,10 @@ export function proxy(request: NextRequest): NextResponse {
   if (decision === "unauthorized") return withHeaders(NextResponse.json({ error: "unauthorized" }, { status: 401 }), headers, pathname);
 
   // Next reads the nonce from the request's CSP header and applies it to its own scripts and styles.
+  // x-nonce is for the few scripts we write ourselves (the theme script in the root layout): they need it too.
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("Content-Security-Policy", headers["Content-Security-Policy"]!);
+  requestHeaders.set("x-nonce", nonce);
   return withHeaders(NextResponse.next({ request: { headers: requestHeaders } }), headers, pathname);
 }
 

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { denyNonAdmin, resetPassword, setDisabled, setRoles, type AdminCtx, type Done } from "./admin";
+import { denyNonAdmin, resetMfa, resetPassword, setDisabled, setMfaRequired, setRoles, type AdminCtx, type Done } from "./admin";
 import { requestContext, requireAccess } from "./dal";
 import { getDb } from "./db";
 
@@ -74,6 +74,28 @@ export async function resetPasswordAction(_prev: AdminState, form: FormData): Pr
     if (!result.ok) return { error: result.error };
     revalidatePath("/admin/users");
     return { message: "Temporary password set. It is shown once; the user must change it at next login.", temporaryPassword: result.temporaryPassword };
+  } catch (err) {
+    return failed(err);
+  }
+}
+
+export async function setMfaRequiredAction(_prev: AdminState, form: FormData): Promise<AdminState> {
+  const a = await admin(form, "mfa.require");
+  if (isState(a)) return a;
+  const flag = form.get("required");
+  if (flag !== "true" && flag !== "false") return { error: "Invalid request." };
+  try {
+    return finish(setMfaRequired(getDb(), a.actorId, a.targetId, flag === "true", a.ctx), flag === "true" ? "MFA is now required for this user." : "MFA is no longer required for this user.");
+  } catch (err) {
+    return failed(err);
+  }
+}
+
+export async function resetMfaAction(_prev: AdminState, form: FormData): Promise<AdminState> {
+  const a = await admin(form, "mfa.reset");
+  if (isState(a)) return a;
+  try {
+    return finish(resetMfa(getDb(), a.actorId, a.targetId, a.ctx), "MFA removed. The user's sessions ended.");
   } catch (err) {
     return failed(err);
   }

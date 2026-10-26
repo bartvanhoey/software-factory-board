@@ -7,6 +7,7 @@ import { hashPassword } from "./password";
 import { acctThrottleKey } from "./service";
 import { revokeSessions } from "./sessions";
 import { consume, resetFailures } from "./throttle";
+import { clearMfa } from "./mfa";
 import { findUserById, ROLES, rolesOf, type Role } from "./users";
 
 export interface AdminCtx {
@@ -78,6 +79,11 @@ export function setRoles(db: DatabaseSync, actorId: string, targetId: string, wa
 
     const removesAdmin = current.has("admin") && !roles.has("admin");
     if (removesAdmin && targetId === actorId) return { ok: false, error: "You cannot remove your own admin role." };
+    // Otherwise the rule that only the server can reset an admin's MFA is a detour away: demote them, reset their MFA
+    // and password as an ordinary user, grant admin back, and log in as them. Disable the account instead.
+    if (removesAdmin && target.mfa_enabled_at !== null) {
+      return { ok: false, error: "An administrator who has MFA cannot be demoted here, because that would make their MFA resettable. Disable the account instead, or use the server's break-glass command." };
+    }
     if (removesAdmin && target.disabled_at === null && activeAdminCount(db) - 1 < 1) return { ok: false, error: LAST_ADMIN };
 
     for (const role of ROLES) {
@@ -105,6 +111,37 @@ export function setDisabled(db: DatabaseSync, actorId: string, targetId: string,
     db.prepare("UPDATE users SET disabled_at = ? WHERE id = ?").run(disabled ? now : null, targetId);
     if (disabled) revokeSessions(db, targetId);
     audit(db, { action: disabled ? "user.disabled" : "user.enabled", actor: actorId, target: targetId, ip: ctx.ip }, now);
+    return { ok: true };
+  });
+}
+
+/** The per-user "must use MFA" flag. It applies on the user's next request, because the gate reads it live. */
+export function setMfaRequired(db: DatabaseSync, actorId: string, targetId: string, required: boolean, ctx: AdminCtx): Done {
+  return asAdmin(db, actorId, "mfa.require", targetId, ctx, (now) => {
+    const target = findUserById(db, targetId);
+    if (!target) return { ok: false, error: NOT_FOUND };
+    if ((target.mfa_required === 1) === required) return { ok: true };
+    db.prepare("UPDATE users SET mfa_required = ? WHERE id = ?").run(required ? 1 : 0, targetId);
+    audit(db, { action: required ? "mfa.required_set" : "mfa.required_cleared", actor: actorId, target: targetId, ip: ctx.ip }, now);
+    return { ok: true };
+  });
+}
+
+/**
+ * For a user who lost their authenticator and their recovery codes: removes their MFA and ends their sessions.
+ * An administrator's MFA is out of reach here on purpose (a stolen admin session must not be able to strip another
+ * admin's second factor); that needs the break-glass command on the server.
+ */
+export function resetMfa(db: DatabaseSync, actorId: string, targetId: string, ctx: AdminCtx): Done {
+  return asAdmin(db, actorId, "mfa.reset", targetId, ctx, (now) => {
+    if (targetId === actorId) return { ok: false, error: "You cannot reset your own MFA here." };
+    const target = findUserById(db, targetId);
+    if (!target) return { ok: false, error: NOT_FOUND };
+    if (rolesOf(db, targetId).includes("admin")) return { ok: false, error: "An administrator's MFA can only be reset from the server (break-glass command)." };
+    if (target.mfa_enabled_at === null) return { ok: true };
+    clearMfa(db, targetId);
+    revokeSessions(db, targetId);
+    audit(db, { action: "mfa.reset_by_admin", actor: actorId, target: targetId, ip: ctx.ip }, now);
     return { ok: true };
   });
 }
@@ -150,6 +187,9 @@ export interface UserListItem {
   roles: Role[];
   createdAt: number;
   emailVerified: boolean;
+  mfaEnabled: boolean;
+  /** The per-user flag. Admins are always required to use MFA, whatever this says. */
+  mfaRequired: boolean;
 }
 
 function requireAdmin(db: DatabaseSync, actorId: string): void {
@@ -161,10 +201,19 @@ export function listUsers(db: DatabaseSync, actorId: string): { users: UserListI
   requireAdmin(db, actorId);
   const rows = db
     .prepare(
-      `SELECT u.id, u.email, u.created_at, u.disabled_at, u.email_verified_at, group_concat(r.role) AS roles
+      `SELECT u.id, u.email, u.created_at, u.disabled_at, u.email_verified_at, u.mfa_enabled_at, u.mfa_required, group_concat(r.role) AS roles
        FROM users u LEFT JOIN user_roles r ON r.user_id = u.id GROUP BY u.id`,
     )
-    .all() as { id: string; email: string; created_at: number; disabled_at: number | null; email_verified_at: number | null; roles: string | null }[];
+    .all() as {
+    id: string;
+    email: string;
+    created_at: number;
+    disabled_at: number | null;
+    email_verified_at: number | null;
+    mfa_enabled_at: number | null;
+    mfa_required: number;
+    roles: string | null;
+  }[];
 
   const users = rows.map((r): UserListItem => {
     const roles = (r.roles ? r.roles.split(",") : []) as Role[];
@@ -175,6 +224,8 @@ export function listUsers(db: DatabaseSync, actorId: string): { users: UserListI
       roles: ROLES.filter((role) => roles.includes(role)),
       createdAt: r.created_at,
       emailVerified: r.email_verified_at !== null,
+      mfaEnabled: r.mfa_enabled_at !== null,
+      mfaRequired: r.mfa_required === 1,
     };
   });
   const order = { pending: 0, active: 1, disabled: 2 };

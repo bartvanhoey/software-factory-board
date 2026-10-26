@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { AUDIT_PAGE, denyNonAdmin, generateTemporaryPassword, listAudit, listUsers, resetPassword, setDisabled, setRoles, type AdminCtx } from "./admin";
+import { AUDIT_PAGE, denyNonAdmin, generateTemporaryPassword, listAudit, listUsers, resetMfa, resetPassword, setDisabled, setMfaRequired, setRoles, type AdminCtx } from "./admin";
 import { openDb } from "./db";
 import { hashParams } from "./password";
 import { checkPassword } from "./policy";
@@ -84,10 +84,22 @@ describe("setRoles", () => {
     expect(setRoles(db, admin, admin, ["admin", "viewer"], ctx)).toEqual({ ok: true });
   });
 
-  it("lets one admin demote another while an active admin remains", () => {
+  it("lets one admin demote another who has not set up MFA", () => {
     const other = user("other@example.com", ["admin"]);
     expect(setRoles(db, admin, other, ["viewer"], ctx)).toEqual({ ok: true });
     expect(rolesOf(db, other)).toEqual(["viewer"]);
+  });
+
+  it("will not demote an admin who has MFA, which would be a detour around 'only the server resets an admin's MFA'", async () => {
+    const other = user("other@example.com", ["admin"]);
+    db.prepare("UPDATE users SET mfa_enabled_at = ?, mfa_secret_enc = 'v1.x.y.z' WHERE id = ?").run(T0, other);
+    const r = setRoles(db, admin, other, ["viewer"], ctx);
+    expect(r).toMatchObject({ ok: false, error: expect.stringContaining("Disable the account instead") });
+    expect(rolesOf(db, other)).toEqual(["admin"]);
+    // the whole attack chain therefore stops at its first step
+    expect(resetMfa(db, admin, other, ctx).ok).toBe(false);
+    // offboarding still works: disable them
+    expect(setDisabled(db, admin, other, true, ctx)).toEqual({ ok: true });
   });
 });
 
@@ -236,6 +248,62 @@ describe("resetPassword", () => {
 
   it("reports an unknown user", async () => {
     expect(await resetPassword(db, admin, "no-such-id", ctx)).toEqual({ ok: false, error: "User not found." });
+  });
+});
+
+describe("setMfaRequired", () => {
+  it("sets and clears the flag, audits each change and ignores a repeat", () => {
+    expect(setMfaRequired(db, admin, pending, true, ctx)).toEqual({ ok: true });
+    expect(db.prepare("SELECT mfa_required AS m FROM users WHERE id = ?").get(pending)).toEqual({ m: 1 });
+    setMfaRequired(db, admin, pending, true, ctx);
+    expect(setMfaRequired(db, admin, pending, false, ctx)).toEqual({ ok: true });
+    expect(actions()).toEqual(["mfa.required_set", "mfa.required_cleared"]);
+  });
+
+  it("is for admins only and reports an unknown user", () => {
+    const viewer = user("viewer@example.com", ["viewer"]);
+    expect(setMfaRequired(db, viewer, pending, true, ctx)).toEqual({ ok: false, error: "Administrator access is required." });
+    expect(setMfaRequired(db, admin, "no-such-id", true, ctx)).toEqual({ ok: false, error: "User not found." });
+  });
+
+  it("shows in the user list", () => {
+    setMfaRequired(db, admin, pending, true, ctx);
+    const row = listUsers(db, admin).users.find((u) => u.id === pending)!;
+    expect(row).toMatchObject({ mfaRequired: true, mfaEnabled: false });
+  });
+});
+
+describe("resetMfa", () => {
+  function withMfa(email: string, roles: Role[] = ["viewer"]): string {
+    const id = user(email, roles);
+    db.prepare("UPDATE users SET mfa_enabled_at = ?, mfa_secret_enc = 'v1.x.y.z' WHERE id = ?").run(T0, id);
+    db.prepare("INSERT INTO recovery_codes (user_id, code_hash) VALUES (?, 'hash')").run(id);
+    return id;
+  }
+
+  it("removes a user's MFA, ends their sessions and audits it", () => {
+    const member = withMfa("member@example.com");
+    const { token } = createSession(db, member, {}, T0);
+    expect(resetMfa(db, admin, member, ctx)).toEqual({ ok: true });
+    expect(db.prepare("SELECT mfa_enabled_at, mfa_secret_enc FROM users WHERE id = ?").get(member)).toEqual({ mfa_enabled_at: null, mfa_secret_enc: null });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM recovery_codes WHERE user_id = ?").get(member)).toEqual({ n: 0 });
+    expect(validateSession(db, token, T0)).toBeNull();
+    expect(actions()).toContain("mfa.reset_by_admin");
+  });
+
+  it("will not touch an administrator's MFA, not even another admin's, nor your own", () => {
+    const other = withMfa("other-admin@example.com", ["admin"]);
+    expect(resetMfa(db, admin, other, ctx)).toEqual({ ok: false, error: expect.stringContaining("break-glass") });
+    expect(resetMfa(db, admin, admin, ctx)).toEqual({ ok: false, error: "You cannot reset your own MFA here." });
+    expect(db.prepare("SELECT mfa_enabled_at FROM users WHERE id = ?").get(other)).toEqual({ mfa_enabled_at: T0 });
+  });
+
+  it("does nothing for a user without MFA, refuses non-admins and reports unknown users", () => {
+    expect(resetMfa(db, admin, pending, ctx)).toEqual({ ok: true });
+    expect(actions()).toEqual([]);
+    const viewer = user("viewer@example.com", ["viewer"]);
+    expect(resetMfa(db, viewer, pending, ctx).ok).toBe(false);
+    expect(resetMfa(db, admin, "no-such-id", ctx)).toEqual({ ok: false, error: "User not found." });
   });
 });
 

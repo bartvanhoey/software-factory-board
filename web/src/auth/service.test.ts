@@ -74,6 +74,24 @@ describe("login", () => {
     expect(actions()).toContain("login.success");
   });
 
+  it("starts a pending session when the user has MFA, and a normal one when they do not", async () => {
+    const plain = await login(db, { email: "user@example.com", password: PW }, ctx());
+    if (!plain.ok) throw new Error("setup");
+    expect(validateSession(db, plain.token, T0)!.mfaPending).toBe(false);
+    db.prepare("UPDATE users SET mfa_enabled_at = ? WHERE email = 'user@example.com'").run(T0);
+    const withMfa = await login(db, { email: "user@example.com", password: PW }, ctx({ now: T0 + 1 }));
+    if (!withMfa.ok) throw new Error("setup");
+    expect(validateSession(db, withMfa.token, T0 + 1)!.mfaPending).toBe(true);
+  });
+
+  it("does not hand out a full session when MFA was switched on while the password was being checked", async () => {
+    const inFlight = login(db, { email: "user@example.com", password: PW }, ctx()); // read the row (no MFA), now waiting on scrypt
+    db.prepare("UPDATE users SET mfa_enabled_at = ?, mfa_secret_enc = 'v1.x.y.z' WHERE email = 'user@example.com'").run(T0);
+    const r = await inFlight;
+    if (!r.ok) throw new Error("login should still succeed");
+    expect(validateSession(db, r.token, T0)!.mfaPending).toBe(true);
+  });
+
   it("gives the same error for a wrong password, an unknown email and a malformed email", async () => {
     const errors = await Promise.all(
       [
@@ -184,6 +202,19 @@ describe("changePassword", () => {
     if (!a.ok) throw new Error("setup");
     const r = await changePassword(db, a.token, { current: "caf\u00e9 au lait 123", next: "cafe\u0301 au lait 123" }, ctx());
     expect(r).toMatchObject({ ok: false, error: expect.stringContaining("different") });
+  });
+
+  it("refuses a session that has only passed the password (MFA pending): it must not change the password", async () => {
+    await register(db, { email: "mfa@example.com", password: PW }, ctx());
+    db.prepare("UPDATE users SET mfa_enabled_at = ? WHERE email = 'mfa@example.com'").run(T0);
+    const pending = await login(db, { email: "mfa@example.com", password: PW }, ctx({ now: T0 + 1 }));
+    if (!pending.ok) throw new Error("setup");
+    expect(validateSession(db, pending.token, T0 + 1)!.mfaPending).toBe(true);
+    const r = await changePassword(db, pending.token, { current: PW, next: "an attacker chosen passphrase" }, ctx({ now: T0 + 1 }));
+    expect(r).toEqual({ ok: false, error: "Your session has ended. Log in again." });
+    // the password is unchanged, and no guesses were spent on the password-change throttle
+    expect((await login(db, { email: "mfa@example.com", password: PW }, ctx({ now: T0 + 2 }))).ok).toBe(true);
+    expect(db.prepare("SELECT COUNT(*) AS n FROM throttle WHERE key LIKE 'login:chpw:%'").get()).toEqual({ n: 0 });
   });
 
   it("slows down repeated wrong current passwords", async () => {

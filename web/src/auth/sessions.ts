@@ -13,12 +13,22 @@ export const LIMITS = {
 
 const TOUCH_EVERY = 60_000;
 
+/** After the password, a user with MFA has this long to enter the code; until then the session grants nothing. */
+export const MFA_PENDING_LIMIT = 5 * 60_000;
+
 export interface SessionInfo {
   tokenHash: string;
   userId: string;
   email: string;
   roles: Role[];
   mustChangePassword: boolean;
+  /** Password accepted, second factor not yet. */
+  mfaPending: boolean;
+  mfaEnabled: boolean;
+  /** Admins always, anyone else when an admin turned it on for them. Read live, so it applies at once. */
+  mfaRequired: boolean;
+  /** Required but not set up yet. */
+  needsMfaSetup: boolean;
   expiresAt: number;
 }
 
@@ -30,15 +40,15 @@ export function hashToken(token: string): string {
 export function createSession(
   db: DatabaseSync,
   userId: string,
-  ctx: { ip?: string | null; userAgent?: string | null } = {},
+  ctx: { ip?: string | null; userAgent?: string | null; mfaPending?: boolean } = {},
   now = Date.now(),
 ): { token: string; expiresAt: number } {
   const token = randomBytes(32).toString("base64url");
   const limits = hasRole(rolesOf(db, userId), "admin") ? LIMITS.admin : LIMITS.user;
   const expiresAt = now + limits.absolute;
   db.prepare(
-    "INSERT INTO sessions (id_hash, user_id, created_at, last_seen_at, expires_at, ip, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?)",
-  ).run(hashToken(token), userId, now, now, expiresAt, ctx.ip ?? null, ctx.userAgent?.slice(0, 200) ?? null);
+    "INSERT INTO sessions (id_hash, user_id, created_at, last_seen_at, expires_at, mfa_pending, ip, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+  ).run(hashToken(token), userId, now, now, expiresAt, ctx.mfaPending ? 1 : 0, ctx.ip ?? null, ctx.userAgent?.slice(0, 200) ?? null);
   return { token, expiresAt };
 }
 
@@ -47,11 +57,23 @@ export function validateSession(db: DatabaseSync, token: string, now = Date.now(
   const tokenHash = hashToken(token);
   const row = db
     .prepare(
-      `SELECT s.created_at, s.last_seen_at, s.expires_at, u.id AS user_id, u.email, u.disabled_at, u.must_change_password
+      `SELECT s.created_at, s.last_seen_at, s.expires_at, s.mfa_pending, u.id AS user_id, u.email, u.disabled_at,
+              u.must_change_password, u.mfa_required, u.mfa_enabled_at
        FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id_hash = ?`,
     )
     .get(tokenHash) as
-    | { created_at: number; last_seen_at: number; expires_at: number; user_id: string; email: string; disabled_at: number | null; must_change_password: number }
+    | {
+        created_at: number;
+        last_seen_at: number;
+        expires_at: number;
+        mfa_pending: number;
+        user_id: string;
+        email: string;
+        disabled_at: number | null;
+        must_change_password: number;
+        mfa_required: number;
+        mfa_enabled_at: number | null;
+      }
     | undefined;
   if (!row) return null;
 
@@ -59,21 +81,33 @@ export function validateSession(db: DatabaseSync, token: string, now = Date.now(
   const limits = hasRole(roles, "admin") ? LIMITS.admin : LIMITS.user;
   // expires_at was fixed at login; a user promoted to admin since then must not keep a 7 day session.
   const expiresAt = Math.min(row.expires_at, row.created_at + limits.absolute);
-  if (row.disabled_at !== null || now >= expiresAt || now - row.last_seen_at >= limits.idle) {
+  const pendingTooLong = row.mfa_pending === 1 && now - row.created_at >= MFA_PENDING_LIMIT;
+  if (row.disabled_at !== null || now >= expiresAt || now - row.last_seen_at >= limits.idle || pendingTooLong) {
     db.prepare("DELETE FROM sessions WHERE id_hash = ?").run(tokenHash);
     return null;
   }
   if (now - row.last_seen_at >= TOUCH_EVERY) {
     db.prepare("UPDATE sessions SET last_seen_at = ? WHERE id_hash = ?").run(now, tokenHash);
   }
+  const mfaEnabled = row.mfa_enabled_at !== null;
+  const mfaRequired = row.mfa_required === 1 || hasRole(roles, "admin");
   return {
     tokenHash,
     userId: row.user_id,
     email: row.email,
     roles,
     mustChangePassword: row.must_change_password === 1,
+    mfaPending: row.mfa_pending === 1,
+    mfaEnabled,
+    mfaRequired,
+    needsMfaSetup: mfaRequired && !mfaEnabled,
     expiresAt,
   };
+}
+
+/** Marks a pending session as having passed the second factor. False if it was not pending or not this user's. */
+export function markMfaVerified(db: DatabaseSync, tokenHash: string, userId: string): boolean {
+  return Number(db.prepare("UPDATE sessions SET mfa_pending = 0 WHERE id_hash = ? AND user_id = ? AND mfa_pending = 1").run(tokenHash, userId).changes) === 1;
 }
 
 export function deleteSession(db: DatabaseSync, token: string): void {
@@ -86,5 +120,5 @@ export function revokeSessions(db: DatabaseSync, userId: string, exceptTokenHash
 }
 
 export function purgeExpired(db: DatabaseSync, now = Date.now()): void {
-  db.prepare("DELETE FROM sessions WHERE expires_at <= ?").run(now);
+  db.prepare("DELETE FROM sessions WHERE expires_at <= ? OR (mfa_pending = 1 AND created_at <= ?)").run(now, now - MFA_PENDING_LIMIT);
 }

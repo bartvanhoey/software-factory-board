@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ConfigError, loadAuthConfig } from "./config";
 
-const KEY = Buffer.alloc(32, 7).toString("base64");
+const KEY = Buffer.from(Array.from({ length: 32 }, (_, i) => i + 1)).toString("base64");
 const SMTP = { SMTP_HOST: "smtp.example.com", SMTP_PORT: "587", SMTP_USER: "u", SMTP_PASSWORD: "p", SMTP_FROM: "factory@example.com" };
 
 function problemsOf(env: Record<string, string>): string[] {
@@ -40,6 +40,11 @@ describe("loadAuthConfig", () => {
     const short = Buffer.alloc(16, 1).toString("base64");
     expect(problemsOf({ MFA_ENCRYPTION_KEY: short })).toEqual([expect.stringContaining("exactly 32 bytes")]);
     expect(problemsOf({ MFA_ENCRYPTION_KEY: "not base64 !!" })).toEqual([expect.stringContaining("exactly 32 bytes")]);
+  });
+
+  it("rejects a key that is one byte repeated", () => {
+    expect(problemsOf({ MFA_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64") })).toEqual([expect.stringContaining("not one byte repeated")]);
+    expect(problemsOf({ MFA_ENCRYPTION_KEY: Buffer.alloc(32).toString("base64") })).toEqual([expect.stringContaining("not one byte repeated")]);
   });
 
   it("ignores SMTP settings while EMAIL_VERIFICATION is off", () => {

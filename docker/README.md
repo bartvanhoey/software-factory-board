@@ -55,6 +55,19 @@ user's sessions. Admins cannot remove their own admin role, disable themselves o
 least one active admin must always remain. `/admin/audit` is a read-only, filterable log of who did what. Users are
 disabled, never deleted. Role changes take effect on the next request; they do not end sessions.
 
+Multi-factor authentication (TOTP, any authenticator app): admins must use it, and an admin can require it for any other
+user. Turning it on shows a QR code and ten one-time recovery codes (shown once). After the password, a user with MFA
+has five minutes to enter a code; until then the session grants nothing. A code can be used only once, and wrong
+guesses are delayed like password guesses. Users can get new recovery codes or replace their authenticator at
+`/account/mfa` (both need a current code). Only an admin can turn MFA off for a non-admin (Reset MFA on the users
+screen); an admin's own MFA can only be reset from the server, which the break-glass command (planned) will do. Until
+that command exists, an admin who loses both their authenticator and their recovery codes has no way back in the app.
+An admin who has MFA cannot be demoted from the app (that would make their MFA resettable by a stolen admin session):
+disable the account instead. MFA secrets and recovery-code hashes are derived from `MFA_ENCRYPTION_KEY`: lose that key,
+or change it, and every user must set MFA up again (there is no key rotation yet). The key must be random bytes.
+Admin actions that weaken another account (reset password, reset MFA, require/stop requiring MFA) do not ask for a fresh
+code yet, so a stolen, still-valid admin session can use them; admin sessions are short (1 h idle) for that reason.
+
 Login, registration, the waiting page (for accounts without a role) and password change are live. The first admin
 comes from `ADMIN_EMAIL` and `ADMIN_PASSWORD` and must change its password at first login. Public routes are
 `/login`, `/register` and `/api/health` (the container healthcheck, which answers only `ok` or an error); everything

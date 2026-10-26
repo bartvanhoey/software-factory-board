@@ -77,7 +77,7 @@ describe("proxyDecision", () => {
 
 describe("isNoStorePath", () => {
   it("covers the credential pages", () => {
-    for (const p of ["/login", "/register", "/waiting", "/account/password", "/admin/users", "/admin/audit"]) expect(isNoStorePath(p)).toBe(true);
+    for (const p of ["/login", "/login/mfa", "/register", "/waiting", "/account/password", "/account/mfa/setup", "/admin/users", "/admin/audit"]) expect(isNoStorePath(p)).toBe(true);
     expect(isNoStorePath("/")).toBe(false);
   });
 });
