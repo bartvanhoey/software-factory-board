@@ -7,6 +7,7 @@ import { hashPassword } from "./password";
 import { acctThrottleKey } from "./service";
 import { revokeSessions } from "./sessions";
 import { consume, resetFailures } from "./throttle";
+import { BREAKGLASS_RESET_MFA } from "./breakglass-hint";
 import { clearMfa } from "./mfa";
 import { findUserById, ROLES, rolesOf, type Role } from "./users";
 
@@ -82,7 +83,7 @@ export function setRoles(db: DatabaseSync, actorId: string, targetId: string, wa
     // Otherwise the rule that only the server can reset an admin's MFA is a detour away: demote them, reset their MFA
     // and password as an ordinary user, grant admin back, and log in as them. Disable the account instead.
     if (removesAdmin && target.mfa_enabled_at !== null) {
-      return { ok: false, error: "An administrator who has MFA cannot be demoted here, because that would make their MFA resettable. Disable the account instead, or use the server's break-glass command." };
+      return { ok: false, error: `An administrator who has MFA cannot be demoted here, because that would make their MFA resettable. Disable the account instead, or remove their MFA from the server first: ${BREAKGLASS_RESET_MFA}` };
     }
     if (removesAdmin && target.disabled_at === null && activeAdminCount(db) - 1 < 1) return { ok: false, error: LAST_ADMIN };
 
@@ -130,14 +131,14 @@ export function setMfaRequired(db: DatabaseSync, actorId: string, targetId: stri
 /**
  * For a user who lost their authenticator and their recovery codes: removes their MFA and ends their sessions.
  * An administrator's MFA is out of reach here on purpose (a stolen admin session must not be able to strip another
- * admin's second factor); that needs the break-glass command on the server.
+ * admin's second factor); that needs the break-glass command on the server (see breakglass.ts).
  */
 export function resetMfa(db: DatabaseSync, actorId: string, targetId: string, ctx: AdminCtx): Done {
   return asAdmin(db, actorId, "mfa.reset", targetId, ctx, (now) => {
     if (targetId === actorId) return { ok: false, error: "You cannot reset your own MFA here." };
     const target = findUserById(db, targetId);
     if (!target) return { ok: false, error: NOT_FOUND };
-    if (rolesOf(db, targetId).includes("admin")) return { ok: false, error: "An administrator's MFA can only be reset from the server (break-glass command)." };
+    if (rolesOf(db, targetId).includes("admin")) return { ok: false, error: `An administrator's MFA can only be reset from the server: ${BREAKGLASS_RESET_MFA}` };
     if (target.mfa_enabled_at === null) return { ok: true };
     clearMfa(db, targetId);
     revokeSessions(db, targetId);

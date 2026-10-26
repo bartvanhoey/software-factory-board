@@ -293,7 +293,7 @@ describe("resetMfa", () => {
 
   it("will not touch an administrator's MFA, not even another admin's, nor your own", () => {
     const other = withMfa("other-admin@example.com", ["admin"]);
-    expect(resetMfa(db, admin, other, ctx)).toEqual({ ok: false, error: expect.stringContaining("break-glass") });
+    expect(resetMfa(db, admin, other, ctx)).toEqual({ ok: false, error: expect.stringContaining("npm run admin -- reset-mfa") });
     expect(resetMfa(db, admin, admin, ctx)).toEqual({ ok: false, error: "You cannot reset your own MFA here." });
     expect(db.prepare("SELECT mfa_enabled_at FROM users WHERE id = ?").get(other)).toEqual({ mfa_enabled_at: T0 });
   });

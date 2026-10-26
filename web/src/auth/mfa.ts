@@ -183,6 +183,11 @@ export function confirmSetup(
   }
 
   const recoveryCodes = transaction(db, () => {
+    // Re-read under the lock: the break-glass command may have ended this session or removed the pending secret
+    // since the checks above, and a stale confirmation must not turn MFA back on with a secret nobody holds.
+    const still = db.prepare("SELECT secret_enc, session_hash FROM mfa_setup WHERE user_id = ?").get(session.userId) as { secret_enc: string; session_hash: string } | undefined;
+    const alive = db.prepare("SELECT 1 AS ok FROM sessions WHERE id_hash = ?").get(session.tokenHash);
+    if (!still || still.secret_enc !== row.secret_enc || still.session_hash !== session.tokenHash || !alive) return null;
     const was = findUserById(db, session.userId)!.mfa_enabled_at !== null;
     // MAX: the step counter only ever moves forward, so a code that was already accepted can never come back.
     db.prepare("UPDATE users SET mfa_secret_enc = ?, mfa_enabled_at = ?, mfa_last_step = MAX(mfa_last_step, ?) WHERE id = ?").run(row.secret_enc, now, step, session.userId);
@@ -192,6 +197,7 @@ export function confirmSetup(
     audit(db, { action: was ? "mfa.reenrolled" : "mfa.enabled", actor: session.userId, target: session.userId, ip: ctx.ip }, now);
     return codes;
   });
+  if (!recoveryCodes) return { ok: false, error: "This setup expired. Reload the page to start again." };
   releaseFailure(db, limit);
   return { ok: true, recoveryCodes };
 }

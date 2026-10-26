@@ -95,21 +95,29 @@ export async function login(db: DatabaseSync, input: { email: string; password: 
   // or MFA could be switched on in between and the session would be created without the second factor.
   const rehash = user && valid && needsRehash(user.password_hash) ? await hashPassword(input.password) : null;
 
-  // The hashes above are slow. Re-read the row so a password reset or disable that landed meanwhile still wins.
-  const fresh = user && valid ? findUserById(db, user.id) : undefined;
-  if (!user || !valid || !fresh || fresh.password_hash !== user.password_hash || fresh.disabled_at !== null) {
+  // The hashes above are slow. Re-read the row so a password reset, a disable or a newly enabled MFA that landed
+  // meanwhile still wins. The re-read and the new session are ONE transaction: another process (the break-glass
+  // command) can write between two statements, so "no await in between" is not enough.
+  const session = user && valid
+    ? transaction(db, () => {
+        const fresh = findUserById(db, user.id);
+        if (!fresh || fresh.password_hash !== user.password_hash || fresh.disabled_at !== null) return null;
+        resetFailures(db, acctKey);
+        for (const k of keys.slice(1)) releaseFailure(db, k);
+        if (rehash) db.prepare("UPDATE users SET password_hash = ? WHERE id = ? AND password_hash = ?").run(rehash, user.id, user.password_hash);
+        purgeExpired(db, now);
+        audit(db, { action: "login.success", actor: user.id, target: user.id, ip: ctx.ip }, now);
+        // With MFA the session starts pending: it proves the password only and grants nothing until the code is entered.
+        return createSession(db, user.id, { ...ctx, mfaPending: fresh.mfa_enabled_at !== null }, now);
+      })
+    : null;
+
+  if (!session) {
     // Only real accounts are audited: the log is append-only, so unknown emails must not be able to grow it.
-    if (user) audit(db, { action: "login.failed", target: user.id, ip: ctx.ip, detail: { disabled: (fresh ?? user).disabled_at !== null && valid } }, now);
+    if (user) audit(db, { action: "login.failed", target: user.id, ip: ctx.ip, detail: { disabled: findUserById(db, user.id)?.disabled_at != null && valid } }, now);
     return { ok: false, error: GENERIC_LOGIN_ERROR };
   }
-
-  resetFailures(db, acctKey);
-  for (const k of keys.slice(1)) releaseFailure(db, k);
-  if (rehash) db.prepare("UPDATE users SET password_hash = ? WHERE id = ? AND password_hash = ?").run(rehash, user.id, user.password_hash);
-  purgeExpired(db, now);
-  audit(db, { action: "login.success", actor: user.id, target: user.id, ip: ctx.ip }, now);
-  // With MFA the session starts pending: it proves the password only and grants nothing until the code is entered.
-  return { ok: true, ...createSession(db, user.id, { ...ctx, mfaPending: fresh.mfa_enabled_at !== null }, now) };
+  return { ok: true, ...session };
 }
 
 export function logout(db: DatabaseSync, token: string, ctx: Ctx): void {
@@ -147,12 +155,18 @@ export async function changePassword(
   if (input.next.normalize("NFKC") === input.current.normalize("NFKC")) return { ok: false, error: "Choose a password different from the current one." };
 
   const newHash = await hashPassword(input.next);
-  transaction(db, () => {
+  const done = transaction(db, () => {
+    // The hash above is slow: an admin's or the break-glass command's reset can land meanwhile. If the password is
+    // no longer the one that was verified, or this session was ended, the change is refused instead of undoing it.
+    const current = findUserById(db, user.id);
+    const alive = db.prepare("SELECT 1 AS ok FROM sessions WHERE id_hash = ?").get(session.tokenHash);
+    if (!current || !alive || current.password_hash !== user.password_hash) return false;
     db.prepare("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?").run(newHash, user.id);
     revokeSessions(db, user.id, session.tokenHash);
     audit(db, { action: "password.changed", actor: user.id, target: user.id, ip: ctx.ip }, now);
+    return true;
   });
-  return { ok: true };
+  return done ? { ok: true } : { ok: false, error: "Your session has ended. Log in again." };
 }
 
 export type SeedResult = "seeded" | "no-config" | "admin-exists" | "email-taken";

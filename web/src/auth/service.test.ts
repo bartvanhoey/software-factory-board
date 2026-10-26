@@ -217,6 +217,27 @@ describe("changePassword", () => {
     expect(db.prepare("SELECT COUNT(*) AS n FROM throttle WHERE key LIKE 'login:chpw:%'").get()).toEqual({ n: 0 });
   });
 
+  it("does not undo a password reset that landed while the new password was being hashed", async () => {
+    const a = await register(db, { email: "user@example.com", password: PW }, ctx());
+    if (!a.ok) throw new Error("setup");
+    const inFlight = changePassword(db, a.token, { current: PW, next: "an attacker chosen passphrase" }, ctx());
+    // the break-glass command (or an admin) resets the password and ends the sessions in the meantime
+    db.prepare("UPDATE users SET password_hash = 'scrypt$1024$8$1$aa$bb', must_change_password = 1 WHERE email = 'user@example.com'").run();
+    db.prepare("DELETE FROM sessions").run();
+    expect(await inFlight).toEqual({ ok: false, error: "Your session has ended. Log in again." });
+    expect((db.prepare("SELECT password_hash AS h FROM users WHERE email = 'user@example.com'").get() as { h: string }).h).toBe("scrypt$1024$8$1$aa$bb");
+    expect(actions()).not.toContain("password.changed");
+  });
+
+  it("refuses a password change from a session that was ended meanwhile, even when the password is unchanged", async () => {
+    const a = await register(db, { email: "user@example.com", password: PW }, ctx());
+    if (!a.ok) throw new Error("setup");
+    const inFlight = changePassword(db, a.token, { current: PW, next: "another good password" }, ctx());
+    db.prepare("DELETE FROM sessions").run();
+    expect(await inFlight).toMatchObject({ ok: false });
+    expect((await login(db, { email: "user@example.com", password: PW }, ctx({ now: T0 + 1 }))).ok).toBe(true); // the old password still works
+  });
+
   it("slows down repeated wrong current passwords", async () => {
     const a = await register(db, { email: "user@example.com", password: PW }, ctx());
     if (!a.ok) throw new Error("setup");

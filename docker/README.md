@@ -60,13 +60,45 @@ user. Turning it on shows a QR code and ten one-time recovery codes (shown once)
 has five minutes to enter a code; until then the session grants nothing. A code can be used only once, and wrong
 guesses are delayed like password guesses. Users can get new recovery codes or replace their authenticator at
 `/account/mfa` (both need a current code). Only an admin can turn MFA off for a non-admin (Reset MFA on the users
-screen); an admin's own MFA can only be reset from the server, which the break-glass command (planned) will do. Until
-that command exists, an admin who loses both their authenticator and their recovery codes has no way back in the app.
+screen); an admin's own MFA can only be reset from the server (see "Break-glass recovery" below).
 An admin who has MFA cannot be demoted from the app (that would make their MFA resettable by a stolen admin session):
-disable the account instead. MFA secrets and recovery-code hashes are derived from `MFA_ENCRYPTION_KEY`: lose that key,
+disable the account instead, or reset their MFA from the server first. MFA secrets and recovery-code hashes are derived from `MFA_ENCRYPTION_KEY`: lose that key,
 or change it, and every user must set MFA up again (there is no key rotation yet). The key must be random bytes.
 Admin actions that weaken another account (reset password, reset MFA, require/stop requiring MFA) do not ask for a fresh
 code yet, so a stolen, still-valid admin session can use them; admin sessions are short (1 h idle) for that reason.
+
+## Break-glass recovery
+
+When the web app cannot help (an admin lost their authenticator and recovery codes, or the only admin forgot their
+password), run the recovery command inside the `web` container. Access to the server is the authorisation, so there is
+no login:
+
+```
+docker compose exec web npm run admin -- reset-mfa      --email <email> --reason "<why>"
+docker compose exec web npm run admin -- reset-password --email <email> --reason "<why>"
+```
+
+- `reset-mfa` removes the user's authenticator, any half-finished setup and recovery codes, and ends all their
+  sessions. It works on admins. An admin (or anyone MFA is required for) sets MFA up again at their next login, after
+  the password. For an account with no MFA at all it changes nothing, not even the sessions (`reset-password` ends those).
+- `reset-password` sets a temporary password, printed once on your terminal, that must be changed at next login, and
+  ends all their sessions. It does not touch MFA, so a lost password alone never removes a second factor.
+- Lost both? Run both, hand the temporary password over privately, and they log in, change it and set MFA up again.
+- **If an admin's password may be compromised, run `reset-password` first, or both.** After `reset-mfa` alone an admin can
+  log in with just the old password until MFA is set up again, and whoever logs in first sets up their own authenticator.
+- `--reason` is required: one line, up to 200 characters, with some real text in it and no control or invisible
+  characters. Every change is recorded in the audit log as `mfa.reset_by_cli` or `password.reset_by_cli`, with no
+  actor, `via: "cli"` and your reason. Runs that change nothing, or are refused (unknown account, unusable reason), are
+  not recorded.
+- It only runs against an existing, non-empty auth database, so a mistyped `AUTH_DB_PATH` cannot create an empty one,
+  and it needs no other setting (a broken SMTP value, say, does not block a recovery). It refuses to run as root, which
+  could leave database files the web app cannot write: use `docker compose exec` without `-u root`. Exit codes: 0 done
+  or nothing to do, 1 unknown account or unusable reason, 64 usage, 69 database or environment. If the output breaks
+  after the change (a closed terminal), it says so with 69; for `reset-password` just run it again for a new password.
+- Whoever can run `docker exec` (the `docker` group on Linux, Docker Desktop users on Windows) can use it on any
+  account, including admins. They could already read the database and the `.env` secrets, but the audit log now shows
+  it was done. The temporary password stays in your terminal scrollback, so do not run it where output is logged.
+- If there is no admin at all, `ADMIN_EMAIL` and `ADMIN_PASSWORD` create one again at the next start.
 
 Login, registration, the waiting page (for accounts without a role) and password change are live. The first admin
 comes from `ADMIN_EMAIL` and `ADMIN_PASSWORD` and must change its password at first login. Public routes are

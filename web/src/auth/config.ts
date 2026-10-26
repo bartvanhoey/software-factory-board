@@ -36,6 +36,11 @@ type Env = Record<string, string | undefined>;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
 
+/** Where auth.db is. On its own so the break-glass command needs no other setting to be valid. */
+export function authDbPath(env: Env = process.env): string {
+  return env.AUTH_DB_PATH?.trim() || "/auth/auth.db";
+}
+
 export function loadAuthConfig(env: Env = process.env): AuthConfig {
   const problems: string[] = [];
   // compose passes unset variables as empty strings
@@ -50,7 +55,7 @@ export function loadAuthConfig(env: Env = process.env): AuthConfig {
     return fallback;
   };
 
-  const dbPath = get("AUTH_DB_PATH") ?? "/auth/auth.db";
+  const dbPath = authDbPath(env);
 
   let mfaKey = Buffer.alloc(0);
   const rawKey = get("MFA_ENCRYPTION_KEY");
