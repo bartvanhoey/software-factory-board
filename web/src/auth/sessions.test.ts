@@ -83,6 +83,13 @@ describe("sessions", () => {
     expect(markMfaVerified(db, s.tokenHash, user)).toBe(false); // no longer pending
   });
 
+  it("reports whether the address is confirmed, so the gate can read it live", () => {
+    const { token } = createSession(db, user, {}, T0);
+    expect(validateSession(db, token, T0)!.emailVerified).toBe(false);
+    db.prepare("UPDATE users SET email_verified_at = ? WHERE id = ?").run(T0, user);
+    expect(validateSession(db, token, T0 + 1000)!.emailVerified).toBe(true); // the same session sees it at once
+  });
+
   it("gives a pending session only five minutes", () => {
     const { token } = createSession(db, user, { mfaPending: true }, T0);
     expect(validateSession(db, token, T0 + MFA_PENDING_LIMIT - 1000)).not.toBeNull();

@@ -14,17 +14,21 @@ export async function readToken(): Promise<string | undefined> {
   return (await cookies()).get(sessionCookieName(getAuthConfig().cookieSecure))?.value;
 }
 
+/** A session plus the one rule that comes from configuration: whether this user must confirm their address first. */
+export type AppSession = SessionInfo & { needsEmailVerification: boolean };
+
 /** The validated session for this request, or null. Cached per request. */
-export const getSession = cache(async (): Promise<SessionInfo | null> => {
+export const getSession = cache(async (): Promise<AppSession | null> => {
   const token = await readToken();
-  return token ? validateSession(getDb(), token) : null;
+  const session = token ? validateSession(getDb(), token) : null;
+  return session && { ...session, needsEmailVerification: getAuthConfig().emailVerification && !session.emailVerified };
 });
 
 /**
  * Any logged-in user, whatever state they are in, except one who has only passed the password: that session grants
  * nothing until the code is entered. For the pages gating sends people to.
  */
-export async function requireUser(): Promise<SessionInfo> {
+export async function requireUser(): Promise<AppSession> {
   const session = await getSession();
   if (!session) redirect("/login");
   if (session.mfaPending) redirect("/login/mfa");
@@ -32,7 +36,7 @@ export async function requireUser(): Promise<SessionInfo> {
 }
 
 /** The one page a pending session belongs on. Anyone else is sent to the board (and from there to their own state). */
-export async function requirePendingMfa(): Promise<SessionInfo> {
+export async function requirePendingMfa(): Promise<AppSession> {
   const session = await getSession();
   if (!session) redirect("/login");
   if (!session.mfaPending) redirect("/");
@@ -40,7 +44,7 @@ export async function requirePendingMfa(): Promise<SessionInfo> {
 }
 
 /** A page that belongs to one gating state (for example MFA setup): anyone in a different state is sent to theirs. */
-export async function requireState(page: string): Promise<SessionInfo> {
+export async function requireState(page: string): Promise<AppSession> {
   const session = await requireUser();
   const gate = gateRedirect(session);
   if (gate && gate !== page) redirect(gate);
@@ -51,7 +55,7 @@ export async function requireState(page: string): Promise<SessionInfo> {
  * The check every protected page and action calls, close to the data (layouts do not re-render on
  * navigation, so a layout check is not enough). Sends users to the screen their state requires.
  */
-export async function requireAccess(role: Role = "viewer", onDenied?: (session: SessionInfo) => void | Promise<void>): Promise<SessionInfo> {
+export async function requireAccess(role: Role = "viewer", onDenied?: (session: SessionInfo) => void | Promise<void>): Promise<AppSession> {
   const session = await requireUser();
   const gate = gateRedirect(session);
   if (gate) redirect(gate);

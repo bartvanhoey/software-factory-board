@@ -112,4 +112,32 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX recovery_codes_user_id ON recovery_codes (user_id);
     `,
   },
+  {
+    version: 5,
+    name: "email tokens",
+    sql: `
+      -- Links sent by email (verify an address, reset a password). Only a hash of the token is stored, and it also
+      -- covers the purpose, so a token for one cannot be used for the other. used_at makes a link single-use.
+      CREATE TABLE email_tokens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL REFERENCES users (id),
+        purpose TEXT NOT NULL CHECK (purpose IN ('verify', 'reset')),
+        token_hash TEXT NOT NULL UNIQUE,
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL,
+        used_at INTEGER
+      ) STRICT;
+      CREATE INDEX email_tokens_user ON email_tokens (user_id, purpose);
+
+      -- A reset link must not outlive a password change, whoever or whatever made it (the user, an admin, the break-glass
+      -- command, the web app's own reset): otherwise evicting an intruder by changing the password leaves their link
+      -- working. A trigger covers every writer, present and future. Disabling an account ends all its unused links.
+      CREATE TRIGGER email_tokens_void_on_password_change AFTER UPDATE OF password_hash ON users
+        WHEN NEW.password_hash <> OLD.password_hash
+        BEGIN DELETE FROM email_tokens WHERE user_id = NEW.id AND purpose = 'reset' AND used_at IS NULL; END;
+      CREATE TRIGGER email_tokens_void_on_disable AFTER UPDATE OF disabled_at ON users
+        WHEN NEW.disabled_at IS NOT NULL AND OLD.disabled_at IS NULL
+        BEGIN DELETE FROM email_tokens WHERE user_id = NEW.id AND used_at IS NULL; END;
+    `,
+  },
 ];

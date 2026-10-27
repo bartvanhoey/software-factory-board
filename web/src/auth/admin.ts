@@ -2,6 +2,7 @@
 import { randomInt } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { audit } from "./audit";
+import { voidTokens } from "./email-tokens";
 import { transaction } from "./db";
 import { hashPassword } from "./password";
 import { acctThrottleKey } from "./service";
@@ -112,6 +113,22 @@ export function setDisabled(db: DatabaseSync, actorId: string, targetId: string,
     db.prepare("UPDATE users SET disabled_at = ? WHERE id = ?").run(disabled ? now : null, targetId);
     if (disabled) revokeSessions(db, targetId);
     audit(db, { action: disabled ? "user.disabled" : "user.enabled", actor: actorId, target: targetId, ip: ctx.ip }, now);
+    return { ok: true };
+  });
+}
+
+/**
+ * For an address that cannot receive mail (a typo, a mailbox that is gone) or a person the admin has verified another
+ * way. Without this, switching EMAIL_VERIFICATION on could lock such a user out for good.
+ */
+export function markEmailVerified(db: DatabaseSync, actorId: string, targetId: string, ctx: AdminCtx): Done {
+  return asAdmin(db, actorId, "email.verify", targetId, ctx, (now) => {
+    const target = findUserById(db, targetId);
+    if (!target) return { ok: false, error: NOT_FOUND };
+    if (target.email_verified_at !== null) return { ok: true };
+    db.prepare("UPDATE users SET email_verified_at = ? WHERE id = ?").run(now, targetId);
+    voidTokens(db, targetId, "verify");
+    audit(db, { action: "email.verified_by_admin", actor: actorId, target: targetId, ip: ctx.ip }, now);
     return { ok: true };
   });
 }

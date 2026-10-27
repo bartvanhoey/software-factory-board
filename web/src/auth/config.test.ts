@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ConfigError, loadAuthConfig } from "./config";
 
 const KEY = Buffer.from(Array.from({ length: 32 }, (_, i) => i + 1)).toString("base64");
-const SMTP = { SMTP_HOST: "smtp.example.com", SMTP_PORT: "587", SMTP_USER: "u", SMTP_PASSWORD: "p", SMTP_FROM: "factory@example.com" };
+const SMTP = { SMTP_HOST: "smtp.example.com", SMTP_PORT: "587", SMTP_USER: "u", SMTP_PASSWORD: "p", SMTP_FROM: "factory@example.com", APP_URL: "https://board.example.com" };
 
 function problemsOf(env: Record<string, string>): string[] {
   try {
@@ -53,13 +53,39 @@ describe("loadAuthConfig", () => {
 
   it("requires every SMTP setting when EMAIL_VERIFICATION=true", () => {
     const problems = problemsOf({ MFA_ENCRYPTION_KEY: KEY, EMAIL_VERIFICATION: "true" });
-    expect(problems).toHaveLength(5);
+    expect(problems).toHaveLength(6);
     expect(problems.join()).toContain("SMTP_HOST is required");
   });
 
   it("returns the SMTP settings when EMAIL_VERIFICATION=true and all are set", () => {
     const cfg = loadAuthConfig({ MFA_ENCRYPTION_KEY: KEY, EMAIL_VERIFICATION: "true", ...SMTP });
     expect(cfg.smtp).toEqual({ host: "smtp.example.com", port: 587, user: "u", password: "p", from: "factory@example.com" });
+    expect(cfg.appUrl).toBe("https://board.example.com");
+  });
+
+  it("takes only the origin of APP_URL: a trailing slash is fine, and it is returned without one", () => {
+    const cfg = loadAuthConfig({ MFA_ENCRYPTION_KEY: KEY, EMAIL_VERIFICATION: "true", ...SMTP, APP_URL: "https://board.example.com/" });
+    expect(cfg.appUrl).toBe("https://board.example.com");
+    expect(loadAuthConfig({ MFA_ENCRYPTION_KEY: KEY, EMAIL_VERIFICATION: "true", ...SMTP, APP_URL: "https://board.example.com:8443" }).appUrl).toBe("https://board.example.com:8443");
+  });
+
+  it("allows http for this machine only", () => {
+    for (const ok of ["http://localhost:2999", "http://127.0.0.1:2999", "http://[::1]:2999"]) {
+      expect(loadAuthConfig({ MFA_ENCRYPTION_KEY: KEY, EMAIL_VERIFICATION: "true", ...SMTP, APP_URL: ok }).appUrl).toBeTruthy();
+    }
+    expect(problemsOf({ MFA_ENCRYPTION_KEY: KEY, EMAIL_VERIFICATION: "true", ...SMTP, APP_URL: "http://board.example.com" })).toEqual([expect.stringContaining("https://")]);
+  });
+
+  it("rejects an APP_URL that is not a plain address, without echoing it", () => {
+    for (const bad of ["board.example.com", "https://board.example.com/app", "https://board.example.com?x=1", "https://board.example.com/#top", "https://user:secret@board.example.com", "javascript:alert(1)", "ftp://board.example.com"]) {
+      const problems = problemsOf({ MFA_ENCRYPTION_KEY: KEY, EMAIL_VERIFICATION: "true", ...SMTP, APP_URL: bad });
+      expect(problems).toEqual([expect.stringContaining("APP_URL")]);
+      expect(problems.join()).not.toContain("secret");
+    }
+  });
+
+  it("does not ask for APP_URL while verification is off", () => {
+    expect(loadAuthConfig({ MFA_ENCRYPTION_KEY: KEY }).appUrl).toBeNull();
   });
 
   it("rejects a bad SMTP port and a bad sender", () => {

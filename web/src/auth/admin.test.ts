@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { AUDIT_PAGE, denyNonAdmin, generateTemporaryPassword, listAudit, listUsers, resetMfa, resetPassword, setDisabled, setMfaRequired, setRoles, type AdminCtx } from "./admin";
+import { AUDIT_PAGE, denyNonAdmin, generateTemporaryPassword, listAudit, listUsers, markEmailVerified, resetMfa, resetPassword, setDisabled, setMfaRequired, setRoles, type AdminCtx } from "./admin";
+import { issueToken, peekToken } from "./email-tokens";
 import { openDb } from "./db";
 import { hashParams } from "./password";
 import { checkPassword } from "./policy";
@@ -248,6 +249,30 @@ describe("resetPassword", () => {
 
   it("reports an unknown user", async () => {
     expect(await resetPassword(db, admin, "no-such-id", ctx)).toEqual({ ok: false, error: "User not found." });
+  });
+});
+
+describe("markEmailVerified", () => {
+  it("confirms an address by hand, ends its pending links and audits it", () => {
+    const link = issueToken(db, pending, "verify", T0);
+    expect(markEmailVerified(db, admin, pending, ctx)).toEqual({ ok: true });
+    expect((db.prepare("SELECT email_verified_at AS v FROM users WHERE id = ?").get(pending) as { v: number }).v).toBe(T0);
+    expect(peekToken(db, link, "verify", T0 + 1000)).toBeNull();
+    expect(actions()).toEqual(["email.verified_by_admin"]);
+    expect(listUsers(db, admin).users.find((u) => u.id === pending)!.emailVerified).toBe(true);
+  });
+
+  it("does nothing, and audits nothing, for an address that is already confirmed", () => {
+    markEmailVerified(db, admin, pending, ctx);
+    expect(markEmailVerified(db, admin, pending, ctx)).toEqual({ ok: true });
+    expect(actions()).toEqual(["email.verified_by_admin"]);
+  });
+
+  it("is for admins only and reports an unknown user", () => {
+    const viewer = user("viewer@example.com", ["viewer"]);
+    expect(markEmailVerified(db, viewer, pending, ctx)).toEqual({ ok: false, error: "Administrator access is required." });
+    expect(markEmailVerified(db, admin, "no-such-id", ctx)).toEqual({ ok: false, error: "User not found." });
+    expect((db.prepare("SELECT email_verified_at AS v FROM users WHERE id = ?").get(pending) as { v: number | null }).v).toBeNull();
   });
 });
 
