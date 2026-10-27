@@ -63,6 +63,9 @@ COPY shared/package.json shared/
 COPY web/package.json web/
 COPY runner/package.json runner/
 RUN npm ci
+# The break-glass command (`npm run admin`) runs TypeScript with tsx: fail the build rather than find out during an
+# incident that it is missing (for example after someone installs without dev dependencies).
+RUN node_modules/.bin/tsx --version
 COPY shared shared
 COPY runner runner
 COPY prompts prompts

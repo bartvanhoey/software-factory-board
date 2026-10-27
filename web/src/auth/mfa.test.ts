@@ -138,6 +138,16 @@ describe("confirmSetup", () => {
     expect(confirmSetup(db, KEY, s, totp(secretOf("mfa_setup"), late), ctx(late))).toMatchObject({ ok: false, error: expect.stringContaining("expired") });
   });
 
+  it("refuses a confirmation from a session that was ended after the setup began (a stale confirmation turns nothing on)", () => {
+    const s = sessionOf();
+    pendingSetup(db, KEY, user, s.tokenHash, T0);
+    const code = totp(secretOf("mfa_setup"), T0);
+    db.prepare("DELETE FROM sessions WHERE id_hash = ?").run(s.tokenHash); // e.g. the break-glass command ended it
+    expect(confirmSetup(db, KEY, s, code, ctx())).toMatchObject({ ok: false, error: expect.stringContaining("expired") });
+    expect((db.prepare("SELECT mfa_enabled_at FROM users WHERE id = ?").get(user) as { mfa_enabled_at: number | null }).mfa_enabled_at).toBeNull();
+    expect(db.prepare("SELECT COUNT(*) AS n FROM recovery_codes").get()).toEqual({ n: 0 });
+  });
+
   it("ends every other session of the user and keeps the one that enrolled", () => {
     const other = createSession(db, user, {}, T0).token;
     const { token } = enrol();

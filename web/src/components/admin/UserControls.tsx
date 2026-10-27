@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import { BREAKGLASS_RESET_MFA } from "@/auth/breakglass-hint";
 import { resetMfaAction, resetPasswordAction, saveRolesAction, setDisabledAction, setMfaRequiredAction, type AdminState } from "@/auth/admin-actions";
 
 const ROLES = ["admin", "issue-admin", "viewer"] as const;
@@ -113,7 +114,8 @@ export function UserControls({
             <Feedback state={resetState} />
           </form>
           {isAdmin ? (
-            <p className="basis-full text-xs text-zinc-500 dark:text-zinc-400">MFA is always required for admins. Only the server&apos;s break-glass command can reset an admin&apos;s MFA.</p>
+            <p className="basis-full text-xs text-zinc-500 dark:text-zinc-400">MFA is always required for admins. An admin&apos;s MFA can only be reset from the server: <code className="font-mono">{BREAKGLASS_RESET_MFA}</code>
+            </p>
           ) : (
             <>
               <form action={requireAction}>
