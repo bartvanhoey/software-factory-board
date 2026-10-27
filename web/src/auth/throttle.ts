@@ -50,6 +50,7 @@ export function resetFailures(db: DatabaseSync, key: string): void {
 
 /** Fixed window: true and counts the hit while under the limit, false once the window is full. */
 export function consume(db: DatabaseSync, key: string, limit: number, windowMs: number, now = Date.now()): boolean {
+  db.prepare("DELETE FROM throttle WHERE updated_at < ?").run(now - FORGET_AFTER);
   const r = row(db, key);
   if (!r || now - r.updated_at >= windowMs) {
     db.prepare(

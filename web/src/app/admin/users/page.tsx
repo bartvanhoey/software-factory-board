@@ -1,4 +1,5 @@
 import { listUsers } from "@/auth/admin";
+import { getAuthConfig } from "@/auth/config";
 import { requireAccess } from "@/auth/dal";
 import { getDb } from "@/auth/db";
 import { UserControls } from "@/components/admin/UserControls";
@@ -17,6 +18,7 @@ const statusStyle = {
 export default async function UsersPage() {
   const admin = await requireAccess("admin");
   const { users, pending } = listUsers(getDb(), admin.userId);
+  const emailVerification = getAuthConfig().emailVerification;
 
   return (
     <main>
@@ -33,6 +35,7 @@ export default async function UsersPage() {
               <th scope="col" className="py-2 pr-4">Account</th>
               <th scope="col" className="py-2 pr-4">Status</th>
               <th scope="col" className="py-2 pr-4">MFA</th>
+              {emailVerification && <th scope="col" className="py-2 pr-4">Email</th>}
               <th scope="col" className="py-2 pr-4">Created</th>
               <th scope="col" className="py-2">Roles and actions</th>
             </tr>
@@ -48,6 +51,7 @@ export default async function UsersPage() {
                   {u.mfaEnabled ? "on" : "off"}
                   {u.mfaRequired || u.roles.includes("admin") ? " · required" : ""}
                 </td>
+                {emailVerification && <td className="py-3 pr-4 text-zinc-600 dark:text-zinc-400">{u.emailVerified ? "confirmed" : "not confirmed"}</td>}
                 <td className="py-3 pr-4 text-zinc-600 dark:text-zinc-400">{day(u.createdAt)}</td>
                 <td className="py-3">
                   <UserControls
@@ -58,6 +62,8 @@ export default async function UsersPage() {
                     isSelf={u.id === admin.userId}
                     mfaEnabled={u.mfaEnabled}
                     mfaRequired={u.mfaRequired}
+                    emailVerified={u.emailVerified}
+                    emailVerification={emailVerification}
                   />
                 </td>
               </tr>

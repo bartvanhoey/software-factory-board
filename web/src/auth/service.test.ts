@@ -31,6 +31,13 @@ describe("register", () => {
     expect(actions()).toEqual(["user.registered"]);
   });
 
+  it("refuses an address that could never receive mail (commas, brackets, quotes), because it would be a dead account", async () => {
+    for (const email of ["a,b@example.com", "a;b@example.com", "<a>@example.com", '"a"@example.com', "a(b)@example.com"]) {
+      expect(await register(db, { email, password: PW }, ctx())).toEqual({ ok: false, error: "Enter a valid email address." });
+    }
+    expect(db.prepare("SELECT COUNT(*) AS n FROM users").get()).toEqual({ n: 0 });
+  });
+
   it("rejects a bad email, a weak password and a duplicate", async () => {
     expect(await register(db, { email: "nope", password: PW }, ctx())).toMatchObject({ ok: false, error: expect.stringContaining("valid email") });
     expect(await register(db, { email: "a@example.com", password: "short" }, ctx())).toMatchObject({ ok: false });

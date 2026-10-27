@@ -22,6 +22,8 @@ export interface SessionInfo {
   email: string;
   roles: Role[];
   mustChangePassword: boolean;
+  /** The address has been confirmed (or an admin marked it). Only enforced when EMAIL_VERIFICATION is on. */
+  emailVerified: boolean;
   /** Password accepted, second factor not yet. */
   mfaPending: boolean;
   mfaEnabled: boolean;
@@ -58,7 +60,7 @@ export function validateSession(db: DatabaseSync, token: string, now = Date.now(
   const row = db
     .prepare(
       `SELECT s.created_at, s.last_seen_at, s.expires_at, s.mfa_pending, u.id AS user_id, u.email, u.disabled_at,
-              u.must_change_password, u.mfa_required, u.mfa_enabled_at
+              u.must_change_password, u.mfa_required, u.mfa_enabled_at, u.email_verified_at
        FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id_hash = ?`,
     )
     .get(tokenHash) as
@@ -73,6 +75,7 @@ export function validateSession(db: DatabaseSync, token: string, now = Date.now(
         must_change_password: number;
         mfa_required: number;
         mfa_enabled_at: number | null;
+        email_verified_at: number | null;
       }
     | undefined;
   if (!row) return null;
@@ -97,6 +100,7 @@ export function validateSession(db: DatabaseSync, token: string, now = Date.now(
     email: row.email,
     roles,
     mustChangePassword: row.must_change_password === 1,
+    emailVerified: row.email_verified_at !== null,
     mfaPending: row.mfa_pending === 1,
     mfaEnabled,
     mfaRequired,

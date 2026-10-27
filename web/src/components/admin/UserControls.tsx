@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { BREAKGLASS_RESET_MFA } from "@/auth/breakglass-hint";
-import { resetMfaAction, resetPasswordAction, saveRolesAction, setDisabledAction, setMfaRequiredAction, type AdminState } from "@/auth/admin-actions";
+import { markEmailVerifiedAction, resetMfaAction, resetPasswordAction, saveRolesAction, setDisabledAction, setMfaRequiredAction, type AdminState } from "@/auth/admin-actions";
 
 const ROLES = ["admin", "issue-admin", "viewer"] as const;
 const HIDE_AFTER_MS = 60_000;
@@ -52,6 +52,8 @@ export function UserControls({
   isSelf,
   mfaEnabled,
   mfaRequired,
+  emailVerified,
+  emailVerification,
 }: {
   id: string;
   email: string;
@@ -60,12 +62,16 @@ export function UserControls({
   isSelf: boolean;
   mfaEnabled: boolean;
   mfaRequired: boolean;
+  emailVerified: boolean;
+  /** EMAIL_VERIFICATION is on, so an unconfirmed address matters. */
+  emailVerification: boolean;
 }) {
   const [rolesState, rolesAction, rolesPending] = useActionState(saveRolesAction, {});
   const [disableState, disableAction, disablePending] = useActionState(setDisabledAction, {});
   const [resetState, resetAction, resetPending] = useActionState(resetPasswordAction, {});
   const [requireState, requireAction, requirePending] = useActionState(setMfaRequiredAction, {});
   const [resetMfaState, resetMfaFormAction, resetMfaPending] = useActionState(resetMfaAction, {});
+  const [emailState, emailAction, emailPending] = useActionState(markEmailVerifiedAction, {});
   const isAdmin = roles.includes("admin");
 
   return (
@@ -113,6 +119,15 @@ export function UserControls({
             </button>
             <Feedback state={resetState} />
           </form>
+          {emailVerification && !emailVerified && (
+            <form action={emailAction}>
+              <input type="hidden" name="userId" value={id} />
+              <button type="submit" disabled={emailPending} className={button}>
+                Mark email confirmed
+              </button>
+              <Feedback state={emailState} />
+            </form>
+          )}
           {isAdmin ? (
             <p className="basis-full text-xs text-zinc-500 dark:text-zinc-400">MFA is always required for admins. An admin&apos;s MFA can only be reset from the server: <code className="font-mono">{BREAKGLASS_RESET_MFA}</code>
             </p>

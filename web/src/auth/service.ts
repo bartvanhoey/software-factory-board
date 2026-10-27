@@ -7,7 +7,7 @@ import { hashPassword, needsRehash, verifyDummy, verifyPassword } from "./passwo
 import { checkPassword } from "./policy";
 import { createSession, deleteSession, purgeExpired, revokeSessions, validateSession } from "./sessions";
 import { consume, recordFailure, releaseFailure, resetFailures, retryAfter } from "./throttle";
-import { countAdmins, countPending, createUser, findUserByEmail, findUserById, grantRole, normalizeEmail } from "./users";
+import { countAdmins, countPending, createUser, findUserByEmail, findUserById, grantRole, isPlainAddress, normalizeEmail } from "./users";
 
 export interface Ctx {
   /** Null unless TRUST_PROXY is on; see request.ts. */
@@ -50,7 +50,8 @@ const isDuplicateEmail = (err: unknown): boolean => err instanceof Error && /UNI
 export async function register(db: DatabaseSync, input: { email: string; password: string }, ctx: Ctx): Promise<LoggedIn | Failure> {
   const now = ctx.now ?? Date.now();
   const email = normalizeEmail(input.email);
-  if (!email) return { ok: false, error: "Enter a valid email address." };
+  // New accounts only: an address a mailer would refuse can never receive a link, so it would be a dead account.
+  if (!email || !isPlainAddress(email)) return { ok: false, error: "Enter a valid email address." };
   const policy = checkPassword(input.password, email);
   if (policy) return { ok: false, error: policy };
   if (countPending(db) >= PENDING_CAP) return { ok: false, error: "Registration is temporarily closed." };

@@ -78,6 +78,16 @@ describe("gateRedirect", () => {
     expect(gateRedirect({ mustChangePassword: false, roles: ["viewer"] })).toBeNull();
   });
 
+  it("puts an unconfirmed address after the password change and before MFA setup", () => {
+    const all = { mustChangePassword: true, roles: [] as never[], mfaPending: true, needsEmailVerification: true, needsMfaSetup: true };
+    expect(gateRedirect(all)).toBe("/login/mfa");
+    expect(gateRedirect({ ...all, mfaPending: false })).toBe("/account/password");
+    expect(gateRedirect({ ...all, mfaPending: false, mustChangePassword: false })).toBe("/account/verify");
+    expect(gateRedirect({ ...all, mfaPending: false, mustChangePassword: false, needsEmailVerification: false })).toBe("/account/mfa/setup");
+    expect(gateRedirect({ mustChangePassword: false, roles: ["viewer"], needsEmailVerification: true })).toBe("/account/verify");
+    expect(gateRedirect({ mustChangePassword: false, roles: [], needsEmailVerification: true })).toBe("/account/verify"); // before the waiting page too
+  });
+
   it("puts the second factor first, then the password change, then MFA setup, then the waiting page", () => {
     const all = { mustChangePassword: true, roles: [] as never[], mfaPending: true, needsMfaSetup: true };
     expect(gateRedirect(all)).toBe("/login/mfa");

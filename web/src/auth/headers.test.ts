@@ -53,7 +53,7 @@ describe("securityHeaders", () => {
 
 describe("proxyDecision", () => {
   it("lets public paths through without a cookie", () => {
-    for (const p of ["/login", "/register", "/api/health"]) expect(proxyDecision(p, false)).toBe("next");
+    for (const p of ["/login", "/register", "/verify", "/forgot-password", "/reset-password", "/api/health"]) expect(proxyDecision(p, false)).toBe("next");
   });
 
   it("redirects pages to /login and rejects API calls without a cookie", () => {
@@ -67,6 +67,9 @@ describe("proxyDecision", () => {
     expect(proxyDecision("/login/../admin", false)).toBe("login");
     expect(proxyDecision("/api/health/extra", false)).toBe("unauthorized");
     expect(proxyDecision("/loginx", false)).toBe("login");
+    expect(proxyDecision("/verify/extra", false)).toBe("login");
+    expect(proxyDecision("/verifyx", false)).toBe("login");
+    expect(proxyDecision("/account/verify", false)).toBe("login"); // the "check your inbox" page needs a session
   });
 
   it("passes anything through when a cookie is present (the DAL validates it)", () => {
@@ -77,7 +80,7 @@ describe("proxyDecision", () => {
 
 describe("isNoStorePath", () => {
   it("covers the credential pages", () => {
-    for (const p of ["/login", "/login/mfa", "/register", "/waiting", "/account/password", "/account/mfa/setup", "/admin/users", "/admin/audit"]) expect(isNoStorePath(p)).toBe(true);
+    for (const p of ["/login", "/login/mfa", "/register", "/waiting", "/account/password", "/account/mfa/setup", "/account/verify", "/verify", "/forgot-password", "/reset-password", "/admin/users", "/admin/audit"]) expect(isNoStorePath(p)).toBe(true);
     expect(isNoStorePath("/")).toBe(false);
   });
 });

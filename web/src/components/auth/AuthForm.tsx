@@ -18,15 +18,27 @@ export function AuthForm({
   action,
   fields,
   submit,
+  hidden,
 }: {
   action: (prev: FormState, form: FormData) => Promise<FormState>;
   fields: AuthField[];
   submit: string;
+  /** Extra values sent with the form (for example the token from an emailed link). */
+  hidden?: Record<string, string>;
 }) {
   const [state, formAction, pending] = useActionState(action, {});
 
+  if (state.notice) {
+    return (
+      <p role="status" className="rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+        {state.notice}
+      </p>
+    );
+  }
+
   return (
     <form action={formAction} className="space-y-4">
+      {hidden && Object.entries(hidden).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
       {state.error && (
         <p role="alert" className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
           {state.error}

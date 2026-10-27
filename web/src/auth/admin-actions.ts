@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { denyNonAdmin, resetMfa, resetPassword, setDisabled, setMfaRequired, setRoles, type AdminCtx, type Done } from "./admin";
+import { denyNonAdmin, markEmailVerified, resetMfa, resetPassword, setDisabled, setMfaRequired, setRoles, type AdminCtx, type Done } from "./admin";
 import { requestContext, requireAccess } from "./dal";
 import { getDb } from "./db";
 
@@ -96,6 +96,16 @@ export async function resetMfaAction(_prev: AdminState, form: FormData): Promise
   if (isState(a)) return a;
   try {
     return finish(resetMfa(getDb(), a.actorId, a.targetId, a.ctx), "MFA removed. The user's sessions ended.");
+  } catch (err) {
+    return failed(err);
+  }
+}
+
+export async function markEmailVerifiedAction(_prev: AdminState, form: FormData): Promise<AdminState> {
+  const a = await admin(form, "email.verify");
+  if (isState(a)) return a;
+  try {
+    return finish(markEmailVerified(getDb(), a.actorId, a.targetId, a.ctx), "Email address marked as confirmed.");
   } catch (err) {
     return failed(err);
   }

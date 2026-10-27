@@ -43,7 +43,8 @@ Windows folder is unreliable. Back up the volume, and keep `MFA_ENCRYPTION_KEY` 
 | --- | --- | --- | --- |
 | `MFA_ENCRYPTION_KEY` | yes | | 32 random bytes, base64. Encrypts MFA secrets at rest. Lose it and every user must re-enroll MFA. Generate: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | no | | First admin, created on first start only when no admin exists. Set both or neither; password 12-128 characters. Remove `ADMIN_PASSWORD` from `.env` afterwards. |
-| `EMAIL_VERIFICATION` | no | `false` | Not implemented yet: `true` makes the container refuse to start. Later, `true` makes `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` and `SMTP_FROM` required. |
+| `EMAIL_VERIFICATION` | no | `false` | `true` turns on email verification and "forgot password" by email (see "Email verification" below) and makes `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` and `APP_URL` required. |
+| `APP_URL` | with verification | | The public address of the site, an origin with no path (`https://board.example.com`), used for every link in an email. `https` is required except for `localhost`. It is never taken from the request, which a visitor controls. |
 | `COOKIE_SECURE` | no | on in production | Set `false` for plain http on localhost. Exposing the dashboard beyond localhost needs a TLS proxy. |
 | `TRUST_PROXY` | no | `false` | `true` when a reverse proxy you control sets `X-Forwarded-For`; enables per-IP login and registration limits. Leave `false` otherwise: the header is spoofable, and logins are then throttled per account only. Only use `true` when the proxy is the sole way in; if port 2999 is also reachable directly, clients can forge the header and dodge the per-IP limits. |
 | `AUTH_DB_PATH` | no | `/auth/auth.db` | Set by compose. |
@@ -66,6 +67,47 @@ disable the account instead, or reset their MFA from the server first. MFA secre
 or change it, and every user must set MFA up again (there is no key rotation yet). The key must be random bytes.
 Admin actions that weaken another account (reset password, reset MFA, require/stop requiring MFA) do not ask for a fresh
 code yet, so a stolen, still-valid admin session can use them; admin sessions are short (1 h idle) for that reason.
+
+## Email verification and password reset
+
+Off by default: nothing is sent, and passwords are reset by an admin or the break-glass command. With
+`EMAIL_VERIFICATION=true`:
+
+- **Registration** sends a link; until it is confirmed the account is held on a "check your email" page, ahead of MFA
+  setup. Links work once and expire after 24 hours; a new link replaces the old one (an earlier link keeps working if
+  the new one could not be sent). The first admin counts as confirmed.
+- **Confirming needs the inbox and the account's own login.** Opening the link while logged out says to log in first,
+  then open it again. Otherwise someone could register an address that is not theirs, with a password they know, and
+  the real owner opening the link in their own inbox would confirm the squatter's account. The owner cannot log in to
+  that account, so the link does nothing for them; they use "Forgot your password?", which replaces the password, ends
+  the squatter's sessions and confirms the address. Unconfirmed accounts are never removed automatically; an admin can
+  disable them.
+- **Existing users when you switch it on** are held the same way on their next click, sessions included, and no mail
+  has been sent to them yet: their page says so and offers to send one. An admin can press "Mark email confirmed" on the
+  users screen for an address that cannot receive mail (a typo, say).
+- **Forgot password** is on the login page. It always answers "if that address has an account, we sent a link", whether
+  or not there is an account, and the work that depends on the account happens after the answer, so the response time
+  does not show it (the difference is milliseconds of local work; that is not a hard guarantee). It does not hide which
+  addresses exist from someone who tries to register them, which says "already exists". The link works once for an
+  hour, ends all the user's sessions, and does not skip MFA: the next login still asks for a code. Using it also
+  confirms the address. Any password change (the user's, an admin's, the break-glass command's, another reset) or
+  disabling the account ends the unused reset links, so changing a password to evict an intruder also kills any link
+  they can see in the inbox.
+- Opening a link only shows a button or a form: confirming and resetting are POSTs, because mail scanners open links
+  before people do. If your mail provider rewrites links for click tracking, turn that off: the token would pass through it.
+- **Limits:** one email a minute and five an hour per address, ten an hour per IP (only with `TRUST_PROXY`), and two
+  separate budgets of 40 an hour in total (one for "forgot password" mail, one for registration and resend), so the
+  relay and strangers' inboxes cannot be used as a mail cannon and using up one budget does not stop the other. Requests
+  for unknown addresses use none of this. Known trade-offs of having no login on "forgot password": a stranger can use
+  up a budget for an hour, and someone who knows an address can use up its five mails an hour so its owner gets none
+  (and is told nothing). An admin resetting the password is the fallback.
+- **SMTP:** port 465 uses TLS from the first byte; any other port must offer STARTTLS or nothing is sent. The certificate
+  is always verified (to use a private CA, point `NODE_EXTRA_CA_CERTS` at it). Messages are plain text, and one send is
+  given up on after 30 seconds. SMTP is not checked at startup, and logins never need it: if the relay is down only
+  registration, resend and reset are affected, and a failed send is logged (error code only, addresses blanked) and
+  audited (`email.send_failed`) but not retried. The audit log records `email.verification_sent` (only once actually
+  sent), `email.verified`, `password.reset_requested`, `password.reset_by_email` and `email.verified_by_admin`, only for
+  real accounts; as it can never be pruned, the budgets also bound how fast it can grow from this.
 
 ## Break-glass recovery
 

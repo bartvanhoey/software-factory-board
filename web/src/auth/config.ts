@@ -16,6 +16,11 @@ export interface AuthConfig {
   emailVerification: boolean;
   /** Set only when emailVerification is on. */
   smtp: SmtpConfig | null;
+  /**
+   * The public address of this site (an origin, no trailing slash): the base of every link we email. Set only when
+   * emailVerification is on. Links are never built from the request's Host header, which a visitor controls.
+   */
+  appUrl: string | null;
   cookieSecure: boolean;
   /** Believe X-Forwarded-For (set by a reverse proxy we control). Off = no per-IP limits. */
   trustProxy: boolean;
@@ -35,6 +40,22 @@ type Env = Record<string, string | undefined>;
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
+
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/** An origin only (scheme and host), https unless it is this machine. A message names the problem, never the value. */
+function parseAppUrl(raw: string): URL | string {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return "must be a full address such as https://board.example.com";
+  }
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && LOCAL_HOSTS.has(url.hostname))) return "must start with https:// (http:// is only allowed for localhost)";
+  if (url.username || url.password) return "must not contain a username or password";
+  if (url.pathname !== "/" || url.search || url.hash) return "must be just the address, with no path, query or fragment";
+  return url;
+}
 
 /** Where auth.db is. On its own so the break-glass command needs no other setting to be valid. */
 export function authDbPath(env: Env = process.env): string {
@@ -69,6 +90,7 @@ export function loadAuthConfig(env: Env = process.env): AuthConfig {
 
   const emailVerification = bool("EMAIL_VERIFICATION", false);
   let smtp: SmtpConfig | null = null;
+  let appUrl: string | null = null;
   if (emailVerification) {
     const host = get("SMTP_HOST");
     const user = get("SMTP_USER");
@@ -83,6 +105,14 @@ export function loadAuthConfig(env: Env = process.env): AuthConfig {
     }
     if (from && !EMAIL.test(from)) problems.push("SMTP_FROM must be an email address");
     if (host && user && password && from) smtp = { host, port, user, password, from };
+
+    const rawUrl = get("APP_URL");
+    if (!rawUrl) problems.push("APP_URL is required when EMAIL_VERIFICATION=true (the public address of this site, for links in emails)");
+    else {
+      const parsed = parseAppUrl(rawUrl);
+      if (typeof parsed === "string") problems.push(`APP_URL ${parsed}`);
+      else appUrl = parsed.origin;
+    }
   }
 
   const cookieSecure = bool("COOKIE_SECURE", env.NODE_ENV === "production");
@@ -102,7 +132,7 @@ export function loadAuthConfig(env: Env = process.env): AuthConfig {
   }
 
   if (problems.length > 0) throw new ConfigError(problems);
-  return { dbPath, mfaKey, emailVerification, smtp, cookieSecure, trustProxy, admin };
+  return { dbPath, mfaKey, emailVerification, smtp, appUrl, cookieSecure, trustProxy, admin };
 }
 
 // Next bundles proxy, instrumentation and pages separately; share one parsed config per process.

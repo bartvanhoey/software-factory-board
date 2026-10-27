@@ -26,6 +26,14 @@ export function normalizeEmail(raw: string): string | null {
   return email.length <= 254 && EMAIL.test(email) ? email : null;
 }
 
+// One recipient and nothing else: a comma, semicolon or bracket would be read as a list or a display name by a mailer.
+const PLAIN_ADDRESS = /^[^\s,;<>"()[\]\\@]+@[^\s,;<>"()[\]\\@]+$/;
+
+/** An address safe to send mail to. Stricter than normalizeEmail, which only has to find an existing account. */
+export function isPlainAddress(email: string): boolean {
+  return PLAIN_ADDRESS.test(email);
+}
+
 /** Admin implies every other role, and issue-admin implies viewer (it could not use a board it cannot see). */
 export function hasRole(roles: readonly Role[], needed: Role): boolean {
   if (roles.includes("admin")) return true;
