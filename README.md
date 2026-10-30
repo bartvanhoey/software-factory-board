@@ -12,7 +12,7 @@ Issues move through lanes, which are GitHub labels: `ready`, `building`, `qa`, `
 2. **QA** and **review:** each posts its verdict as a comment on the issue. The review lane opens the pull request (`Closes #<n>`) only when it approves, so an open pull request always means "approved".
 3. **Rework:** a card that qa or review sent back is built again on the same branch, up to a limit per project.
 
-The lanes are run by hand today (see [Status](#status-and-limits)). The details are in [runner/README.md](runner/README.md).
+The lanes run by hand, or automatically once you switch the scheduler on (see [The scheduler](#the-scheduler)). The details are in [runner/README.md](runner/README.md).
 
 ## Repository layout
 
@@ -66,9 +66,21 @@ docker compose exec runner npm run runner -- build  --project <name> --dry-run
 docker compose exec runner npm run runner -- build  --project <name>
 ```
 
-Stop it with `docker compose down`. Data stays in named volumes (`auth`, `workspace`, `data`, `cache`).
+Nothing runs by itself until you switch the scheduler on (next section). Stop it with `docker compose down`. Data stays in named volumes (`auth`, `workspace`, `data`, `cache`).
 
 The board listens on `127.0.0.1` only, over plain http, with `COOKIE_SECURE=false` as `.env.example` sets it. To expose it beyond your machine, put a TLS proxy in front first, set `COOKIE_SECURE=true`, and only then change the port mapping. More in [docker/README.md](docker/README.md).
+
+## The scheduler
+
+The scheduler runs the lanes for you. It is off by default: until you set `SCHEDULER_ENABLED=true` in `.env` and restart the runner (`docker compose up -d`), the runner container only idles. Once it is on, it builds every `ready` issue of every enabled project with your GitHub and Claude tokens, so turn it on on purpose.
+
+Each **pass** goes through the lanes in this order: review for every project, then qa, then build. Projects go in name order and one run happens at a time. When a pass ends it waits `SCHEDULER_INTERVAL_MINUTES` (default 5) and starts the next. A single run is stopped after `SCHEDULER_RUN_TIMEOUT_MINUTES` (default 120).
+
+- **It never merges.** Review opens the pull request when it approves and a person merges it.
+- **Pausing:** set `"enabled": false` (a whole project) or `"lanes": { "qa": false }` (one lane) in `projects/<name>.json`. It is read again at every pass, so there is no restart. `docker compose stop runner` stops it.
+- **Failing lanes back off.** A build that fails, a qa or review that cannot decide, or a run that is stopped for taking too long counts as no progress. The lane then waits 5, 10 and 20 minutes, and after three in a row it is paused and tried once an hour until a run makes progress. A card that qa or review sends back is the pipeline working, not a failure. A project that is not logged in to GitHub or lacks a tool is paused until its `projects/<name>.json` changes or the runner restarts.
+- **Watching it:** `docker compose logs -f runner`. Pauses and resumes are also written to `data/events.jsonl` as `system` events.
+- **Stopping mid-run** (`docker compose stop`) ends the run in progress. A build stopped that way leaves its card in `building` without a result: move it back to `ready` yourself.
 
 ## Signing in and roles
 
@@ -138,14 +150,17 @@ Access to the server is the authorisation: anyone who can run `docker exec` can 
 | `TRUST_PROXY` | no | `false` | Believe `X-Forwarded-For` from a proxy you control |
 | `EMAIL_VERIFICATION` | no | `false` | Email verification and reset by email |
 | `SMTP_*`, `APP_URL` | with verification | | See above |
+| `SCHEDULER_ENABLED` | no | `false` | `true` runs the lanes automatically |
+| `SCHEDULER_INTERVAL_MINUTES` | no | `5` | Wait between the end of a pass and the next |
+| `SCHEDULER_RUN_TIMEOUT_MINUTES` | no | `120` | A run is stopped after this long (1 to 170) |
 
 ## Status and limits
 
-Built: the lane commands, the board, the login system described above, and the break-glass command.
+Built: the lane commands, the scheduler, the board, the login system described above, and the break-glass command.
 
 Not built yet:
 
-- **No scheduler.** The lanes run only when you start them. The runner container idles.
+- **The scheduler is basic.** One run at a time, a fixed interval, and no view of it in the web app. Its failure counters are in memory, so a restart clears them. A card that keeps ending without a verdict at the head of the qa or review lane is retried about once an hour (a paused lane is probed that often) and holds up the cards behind it until someone moves it.
 - **Projects are files.** They are added in `projects/*.json`, not from the web app. [ADR 0001](docs/adr/0001-runner-gets-config-from-web-over-internal-api.md) and [ADR 0002](docs/adr/0002-secrets-encrypted-in-db-master-key-outside-it.md) record the accepted direction (settings and encrypted credentials managed in the web app); none of that exists yet.
 - **No network allow-list** for the runner container, which runs agent-written code.
 

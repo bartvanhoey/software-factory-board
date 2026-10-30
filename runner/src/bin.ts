@@ -5,6 +5,6 @@ main(process.argv.slice(2)).then(
   (code) => process.exit(code),
   (e) => {
     console.error(errorMessage(e));
-    process.exit(e instanceof UsageError ? e.exitCode : EXIT.failed);
+    process.exit(e instanceof UsageError ? e.exitCode : EXIT.error);
   },
 );

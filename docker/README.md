@@ -10,7 +10,7 @@ cp .env.example .env        # fill in GH_TOKEN and ANTHROPIC_API_KEY
 docker compose build
 docker compose run --rm --no-deps runner true   # prints toolchain versions
 bash docker/smoke.sh                            # verifies the hardening
-docker compose up -d                            # starts the runner (idle) and the dashboard
+docker compose up -d                            # starts the runner (idle unless SCHEDULER_ENABLED=true) and the dashboard
 docker compose down
 ```
 
@@ -20,7 +20,7 @@ Both run the same image.
 
 | Service | Command | Notes |
 | --- | --- | --- |
-| `runner` | `sleep infinity` (idle) | gets `.env` (`GH_TOKEN`, `ANTHROPIC_API_KEY`); run lanes with `docker compose exec runner npm run runner -- ...`, see `runner/README.md` |
+| `runner` | `runner schedule` (idle unless `SCHEDULER_ENABLED=true`) | gets `.env` (`GH_TOKEN`, `ANTHROPIC_API_KEY`); run lanes with `docker compose exec runner npm run runner -- ...`, see `runner/README.md` |
 | `web` | `next start` on port 2999 | dashboard at http://localhost:2999, bound to `127.0.0.1` only |
 
 The dashboard has a login, but it is served over plain http, so the port is published on localhost only. To expose it

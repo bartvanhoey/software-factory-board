@@ -27,3 +27,11 @@ _Avoid_: Dashboard, kanban
 **Lane**:
 One column of the board, marking how far an issue has progressed. The lanes are ready, building, qa, review and done.
 _Avoid_: Stage, column, status
+
+**Scheduler**:
+The part of an installation that starts the lanes automatically for every enabled project, instead of an Administrator starting them by hand. It is off until an Administrator turns it on.
+_Avoid_: Cron, daemon, loop, orchestrator
+
+**Pass**:
+One round of the scheduler through the lanes of every enabled project.
+_Avoid_: Tick, cycle, iteration, run
