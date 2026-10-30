@@ -21,6 +21,8 @@ export const EVENT_TYPES = [
   "sent_back",
   "inconclusive",
   "failed",
+  "paused",
+  "resumed",
 ] as const;
 
 /** One line of $FACTORY_DATA/events.jsonl, written by the runner and read by the dashboard. */

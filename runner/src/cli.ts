@@ -25,6 +25,7 @@ import { runBuildLane } from "./lanes/build.js";
 import { qaExitCode, runQaLane } from "./lanes/qa.js";
 import { reviewExitCode, runReviewLane } from "./lanes/review.js";
 import { acquireLock } from "./lock.js";
+import { scheduleCommand } from "./scheduler/command.js";
 import { missingTools, programOf } from "./preflight.js";
 import type { EventLog } from "./ports.js";
 import { runProcess } from "./process.js";
@@ -35,6 +36,7 @@ const USAGE = `usage:
   runner qa     --project <name> [--issue <number>] [--dry-run]
   runner review --project <name> [--issue <number>] [--merge] [--dry-run]
   runner labels --project <name> [--dry-run]
+  runner schedule
 
   build   run the build lane once: rework a building card that qa or review sent back (on its branch),
           else take one ready issue, to a pushed branch issue-<n> and the qa label (no PR)
@@ -42,6 +44,8 @@ const USAGE = `usage:
   review  run the review lane once: merge gate and agent review of one review card; on approval it opens
           the PR, and with --merge it also squash-merges it (without --merge the PR waits for a human)
   labels  create the missing ready/building/qa/review labels in the project's repo
+  schedule  run the lanes automatically for every enabled project, pass after pass, until stopped
+          (idles unless SCHEDULER_ENABLED=true; see runner/README.md)
 
   exit codes: 0 ok, 1 failed or sent back, 2 qa or review inconclusive, 64 usage, 65 precondition, 69 missing tool, 75 locked`;
 
@@ -101,6 +105,7 @@ function findProject(projects: Project[], name: string): Project {
 }
 
 export async function main(argv: readonly string[]): Promise<number> {
+  if (argv[0] === "schedule") return scheduleCommand(argv.slice(1));
   const args = parseArgs(argv);
   const settings = loadSettings();
   const project = findProject(loadProjects(settings.projectsDir), args.project);

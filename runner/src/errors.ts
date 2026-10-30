@@ -7,6 +7,8 @@ export const EXIT = {
   precondition: 65,
   missingFile: 66,
   missingTool: 69,
+  /** An unexpected error (a thrown exception), as opposed to a lane that ran and reported failed. */
+  error: 70,
   locked: 75,
 } as const;
 

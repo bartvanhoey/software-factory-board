@@ -19,10 +19,12 @@ services:
     build: *build
     image: software-factory-runner:dev
 
-    # Placeholder: idle so `up` does not exit and restart in a loop.
-    # Use the CLI with: docker compose exec runner npm run runner -- build --project <name>.
-    # The scheduler that runs lanes on a timer replaces this later.
-    command: ["sleep", "infinity"]
+    # The scheduler. It only idles unless SCHEDULER_ENABLED=true in .env, so `up` starts no work by itself.
+    # Lanes can still be run by hand: docker compose exec runner npm run runner -- build --project <name>.
+    # node directly, not npm: npm exits on SIGTERM and the container takes the run in progress down with it.
+    command: ["node", "--import", "tsx", "runner/src/bin.ts", "schedule"]
+    # A stop forwards SIGTERM to the run in progress; this is how long it gets before docker kills the container.
+    stop_grace_period: 60s
 
     # Secrets come from .env (gitignored), never from the image.
     env_file: .env
