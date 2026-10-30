@@ -367,3 +367,8 @@ data/
 .env.local
 .env*.local
 next-env.d.ts
+
+# Local auth database (see web/README.md)
+auth.db
+auth.db-shm
+auth.db-wal
