@@ -152,6 +152,78 @@ describe("runReviewLane: the QA gate", () => {
   });
 });
 
+describe("runReviewLane: a card that is already approved", () => {
+  const APPROVED = "[review] approved at a1b2c3d\nDid: merge gate (main + branch), agent review.\nPR #7: https://github.com/o/r/pull/7";
+  const withApproval = (t: T, body = APPROVED, author = "factory-bot") => {
+    t.gh.issueThread = [{ author: "factory-bot", body: QA_PASS }, { author, body }];
+    t.gh.openPrs.set("issue-4", { number: 7, url: t.gh.prUrl });
+  };
+  const expectUntouched = (t: T) => {
+    expect(t.agent.runs).toEqual([]);
+    expect(t.log.some((l) => l.startsWith("git.worktreeAddDetached"))).toBe(false);
+    expect(t.gh.comments).toEqual([]);
+    expect(t.gh.edits).toEqual([]);
+    expectNothingMerged(t);
+  };
+
+  it("is skipped when the factory approved the current head and its PR is open, so a pass does not review it again", async () => {
+    const t = setup();
+    withApproval(t);
+    expect(await t.run()).toEqual({ status: "noop" });
+    expectUntouched(t);
+    expect(t.events.types).toEqual(["noop"]);
+    expect(reviewExitCode({ status: "noop" })).toBe(0);
+  });
+
+  it("moves on to the next card in the lane instead of stopping at the approved one", async () => {
+    const t = setup();
+    withApproval(t);
+    t.gh.addIssue(5, ["review"], { title: "Green buttons", body: "Make them green." });
+    t.git.remoteBranches.add("issue-5");
+    t.git.refShas.set("origin/issue-5", [HEAD]);
+    const result = await t.run();
+    expect(result).toMatchObject({ status: "approved", issue: 5 });
+    expect(t.agent.runs).toHaveLength(1);
+  });
+
+  it("is reviewed again when the branch has moved since the approval", async () => {
+    const t = setup();
+    withApproval(t, "[review] approved at 1234567\nDid: x");
+    expect((await t.run()).status).toBe("approved");
+    expect(t.agent.runs).toHaveLength(1);
+  });
+
+  it("is reviewed again when its PR is no longer open", async () => {
+    const t = setup();
+    withApproval(t);
+    t.gh.openPrs.clear();
+    expect((await t.run()).status).toBe("approved");
+    expect(t.agent.runs).toHaveLength(1);
+  });
+
+  it("is reviewed again when a later review result replaced the approval", async () => {
+    const t = setup();
+    withApproval(t);
+    t.gh.issueThread.push({ author: "factory-bot", body: "[review] changes requested at a1b2c3d\n❌ Not done:\n- x" });
+    expect((await t.run()).status).toBe("approved");
+    expect(t.agent.runs).toHaveLength(1);
+  });
+
+  it("does not trust an approval comment written by anyone else", async () => {
+    const t = setup();
+    withApproval(t, APPROVED, "mallory");
+    expect((await t.run()).status).toBe("approved");
+    expect(t.agent.runs).toHaveLength(1);
+  });
+
+  it("is merged when the lane runs with --merge, because that is what an approved card waits for", async () => {
+    const t = setup();
+    withApproval(t);
+    expect((await t.run({ merge: true })).status).toBe("merged");
+    expect(t.gh.merges).toHaveLength(1);
+  });
+});
+
 describe("runReviewLane: approved, without --merge", () => {
   it("runs the merge gate, then opens the PR and comments on the issue, and does not merge", async () => {
     const t = setup();
@@ -214,8 +286,8 @@ describe("runReviewLane: approved, without --merge", () => {
 
   it("reuses an open PR instead of opening a second one, so a rerun is safe", async () => {
     const t = setup();
-    expect((await t.run()).status).toBe("approved");
-    expect((await t.run()).status).toBe("approved");
+    expect((await t.run({ issue: 4 })).status).toBe("approved");
+    expect((await t.run({ issue: 4 })).status).toBe("approved");
     expect(t.gh.prs).toHaveLength(1);
     expect(t.log.filter((l) => l.startsWith("gh.createPr"))).toHaveLength(1);
     expect(t.events.types.filter((x) => x === "pr_opened")).toHaveLength(1);
