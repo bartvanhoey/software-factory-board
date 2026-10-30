@@ -20,7 +20,8 @@ npm run build -w web
 npm run start -w web -- -p 3000
 ```
 
-Open http://localhost:3000 and log in as `ADMIN_EMAIL`. Generate the key with
+Open http://localhost:3000 and log in as `ADMIN_EMAIL`. The first login goes through three steps before the board
+shows: choose a new password, set up an authenticator app, and save the ten recovery codes. Generate the key with
 `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`.
 For live data, set `GH_TOKEN` (and drop `FACTORY_DEMO`); without it the page shows demo data and says so in a banner.
 
