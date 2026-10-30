@@ -54,6 +54,23 @@ const hasLabel = (labels: readonly string[], name: string): boolean =>
   labels.some((l) => l.toLowerCase() === name);
 
 /**
+ * The commit the factory's latest review result approved, from its comments (`[review] approved at <sha>`; other results
+ * are `changes requested`, `back to qa` and `inconclusive`). Only comments by `login` count, and the latest result wins.
+ * Returns null unless that latest result is an approval.
+ */
+function latestApproval(comments: readonly { author: string; body: string }[], login: string): string | null {
+  let latest: string | null = null;
+  for (const comment of comments) {
+    if (comment.author.toLowerCase() !== login.toLowerCase()) continue;
+    for (const line of comment.body.replace(/\r/g, "").split("\n")) {
+      const m = /^\[review\] (approved|changes requested|back to qa|inconclusive|merged)\b(?: at ([0-9a-f]{7,40})\b)?/.exec(line);
+      if (m) latest = m[1] === "approved" ? (m[2] ?? null) : null;
+    }
+  }
+  return latest;
+}
+
+/**
  * The review lane: the last gate before a merge.
  *
  * There is no PR until this lane approves, so everything it says goes on the issue.
@@ -87,14 +104,41 @@ export async function runReviewLane(deps: ReviewDeps, opts: ReviewOptions): Prom
     return { status: "failed", reason };
   }
 
+  /** True when the factory approved the card's current head and the PR it opened is still open. Any doubt means false. */
+  const isApproved = async (candidate: number): Promise<boolean> => {
+    try {
+      const approved = latestApproval(await gh.listIssueComments(repo, candidate), (await gh.whoami()).login);
+      if (approved === null) return false;
+      const branch = `issue-${candidate}`;
+      if (!(await gh.findOpenPr(repo, branch))) return false;
+      await git.fetch(cloneDir, "origin", branch);
+      return (await git.revParse(cloneDir, `origin/${branch}`)).startsWith(approved);
+    } catch {
+      return false;
+    }
+  };
+
   // 1. Pick a card, and find its pull request.
   let number = opts.issue;
   if (number === undefined) {
-    const queued = await gh.listIssuesByLabel(repo, "review");
-    number = queued.map((i) => i.number).sort((a, b) => a - b)[0];
-    if (number === undefined) {
+    const queued = (await gh.listIssuesByLabel(repo, "review")).map((i) => i.number).sort((a, b) => a - b);
+    if (queued.length === 0) {
       say("no open issue labelled review");
       emit("noop", "no open issue labelled review");
+      return { status: "noop" };
+    }
+    // An approved card waits in `review` for a human to merge its PR. Without --merge there is nothing left to do for it,
+    // and reviewing it again on every pass would spend the agent on a verdict that is already given.
+    for (const candidate of queued) {
+      if (opts.merge || !(await isApproved(candidate))) {
+        number = candidate;
+        break;
+      }
+    }
+    if (number === undefined) {
+      const why = "every card in review is already approved and waits for a human to merge its PR";
+      say(why);
+      emit("noop", why);
       return { status: "noop" };
     }
   }
