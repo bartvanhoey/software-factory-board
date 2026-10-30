@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { loadProjects, type Project } from "@factory/shared";
+import type { Project } from "@factory/shared";
 import { claudeAgent, shellRunner } from "./adapters/claude.js";
 import { ghCli } from "./adapters/gh.js";
 import { gitCli } from "./adapters/git.js";
@@ -27,6 +27,7 @@ import { reviewExitCode, runReviewLane } from "./lanes/review.js";
 import { acquireLock } from "./lock.js";
 import { scheduleCommand } from "./scheduler/command.js";
 import { missingTools, programOf } from "./preflight.js";
+import { fetchProjects, loadRegistrySettings } from "./registry.js";
 import type { EventLog } from "./ports.js";
 import { runProcess } from "./process.js";
 import { verifyStep } from "./prompt.js";
@@ -108,10 +109,10 @@ export async function main(argv: readonly string[]): Promise<number> {
   if (argv[0] === "schedule") return scheduleCommand(argv.slice(1));
   const args = parseArgs(argv);
   const settings = loadSettings();
-  const project = findProject(loadProjects(settings.projectsDir), args.project);
+  const project = findProject(await fetchProjects(loadRegistrySettings()), args.project);
 
   if (!project.enabled) {
-    say(`${project.name} is disabled in its registry file`);
+    say(`${project.name} is switched off`);
     return 0;
   }
   if (args.command === "build" && !project.lanes.build) {

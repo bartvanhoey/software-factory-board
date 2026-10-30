@@ -23,6 +23,11 @@ docker compose exec runner npm run runner -- review --project <name> [--issue <n
   would change GitHub or the repo. It skips the agent and the tests and writes no events.
 - Needs `GH_TOKEN` (write access to the repo's issues, pull requests and contents) and, for `build`,
   `ANTHROPIC_API_KEY`, both from the root `.env`.
+- The projects come from the web app, not from files (ADR 0001): every command fetches the list from
+  `FACTORY_WEB_URL` (default `http://web:2999`) with `RUNNER_API_TOKEN` as a bearer token. A missing token is a usage
+  error (exit `64`); a web app that is down, refuses the token or sends an answer this version does not understand is
+  exit `70` with a message that never contains the token. The request never follows a redirect and gives up after
+  ten seconds. Clone locations stay here, in `local.json` or `FACTORY_WORKSPACE`.
 - Exit codes: `0` ok or nothing to do, `1` lane failed or a card was sent back, `2` qa or review inconclusive, `64` usage, `65` precondition (for example the
   issue is not `ready`), `66` missing file, `69` missing tool or not logged in, `70` unexpected error (a thrown exception), `75` another run holds the lock.
 
@@ -33,7 +38,7 @@ docker compose exec runner npm run runner -- schedule   # or the container's own
 ```
 
 `runner schedule` runs until SIGTERM. It is what the `runner` service starts, and it only idles unless
-`SCHEDULER_ENABLED=true`. A **pass** reads `projects/` again, then runs `runner review`, `runner qa` and
+`SCHEDULER_ENABLED=true`. A **pass** asks the web app for the projects again, then runs `runner review`, `runner qa` and
 `runner build` for every enabled project, lane by lane (all review runs, then all qa, then all build), projects in
 name order, one run at a time. Each run is a child process of its own. It never passes `--merge`. The next pass starts
 `SCHEDULER_INTERVAL_MINUTES` after the previous one ended.
@@ -46,7 +51,7 @@ What a finished run means:
 | `1` from `qa` or `review` | progress: a card was sent back |
 | `1` from `build`, `2`, a crash, or a run killed after `SCHEDULER_RUN_TIMEOUT_MINUTES` | no progress |
 | `75` | another run holds the lock: skipped, no penalty |
-| `69` | the project is paused until its registry file changes or the runner restarts |
+| `69` | the project is paused until its settings change in the web app or the runner restarts |
 | `65`, `70`, anything else | no progress (`65` is about one card, such as a missing branch, so it never pauses the project) |
 
 No progress backs a project's lane off for 5, 10 and 20 minutes. On the third in a row the lane is paused and probed
@@ -54,8 +59,8 @@ once an hour, until a run makes progress. Pauses and resumes are `system` events
 The counters live in memory only.
 
 A bad `SCHEDULER_*` value makes `runner schedule` exit with a message naming the variable (compose then restarts it, so
-fix `.env`). A registry file that does not validate skips that pass, is recorded once as a `failed` `system` event, and
-is read again at the next. Each run gets its own process group, so a timeout or a stop also ends the agent and the
+fix `.env`). A web app that cannot be reached, or an answer that is not valid, skips that pass, is recorded once as a
+`failed` `system` event, and is asked again at the next. Each run gets its own process group, so a timeout or a stop also ends the agent and the
 build and test commands that run started. On SIGTERM it starts no new run, passes SIGTERM to the run
 in progress and exits when it ends (docker kills the container after `stop_grace_period`, 60 s). A build stopped that way
 leaves its card in `building` with no result: move it back to `ready` by hand.

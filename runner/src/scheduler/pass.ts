@@ -9,8 +9,8 @@ export interface RunResult {
 }
 
 export interface PassDeps {
-  /** Read afresh every pass, so edits to projects/*.json (enabled, lanes) apply without a restart. */
-  loadProjects: () => Project[];
+  /** Fetched afresh every pass, so changes made in the web app (enabled, lanes) apply without a restart. */
+  loadProjects: () => Promise<Project[]>;
   runLane: (lane: Lane, project: string) => Promise<RunResult>;
   backoff: Backoff;
   events: EventLog;
@@ -32,7 +32,7 @@ function announce(deps: PassDeps, project: string, transition: Transition | unde
  * time. Downstream lanes go first so work close to done is finished everywhere before any new work is started.
  */
 export async function runPass(deps: PassDeps): Promise<void> {
-  const projects = deps.loadProjects().sort((a, b) => a.name.localeCompare(b.name));
+  const projects = (await deps.loadProjects()).sort((a, b) => a.name.localeCompare(b.name));
   for (const project of projects) announce(deps, project.name, deps.backoff.refreshProject(project.name, fingerprintOf(project)));
 
   for (const lane of LANES) {

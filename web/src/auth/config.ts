@@ -1,4 +1,5 @@
 // No "server-only" or next/* imports: vitest and the break-glass CLI load this outside Next.
+import { createHash } from "node:crypto";
 import { checkPassword } from "./policy";
 
 export interface SmtpConfig {
@@ -135,11 +136,33 @@ export function loadAuthConfig(env: Env = process.env): AuthConfig {
   return { dbPath, mfaKey, emailVerification, smtp, appUrl, cookieSecure, trustProxy, admin };
 }
 
+/**
+ * The secret the runner presents to the internal projects endpoint. It must be random bytes (base64, at least 32): the
+ * endpoint has no failure throttle, because a shared one would let a stranger lock the real runner out, so the token's
+ * entropy is what makes guessing pointless. Only a SHA-256 digest is kept in memory; the comparison is on digests.
+ */
+export function loadRunnerToken(env: Env = process.env): Buffer {
+  const raw = env.RUNNER_API_TOKEN?.trim();
+  if (!raw) throw new ConfigError(["RUNNER_API_TOKEN is required (at least 32 random bytes, base64): the runner uses it to fetch the projects"]);
+  const bytes = BASE64.test(raw) ? Buffer.from(raw, "base64") : null;
+  // Canonical base64 only: what the generator command prints. A phrase typed by hand rarely round-trips.
+  if (!bytes || bytes.length < 32 || bytes.toString("base64") !== raw) throw new ConfigError(["RUNNER_API_TOKEN must be base64 of at least 32 random bytes, as printed by the generator command in .env.example"]);
+  // Cannot prove randomness, but rejects the obvious: one byte repeated, a short pattern repeated, a counting sequence.
+  if (new Set(bytes).size < 16) throw new ConfigError(["RUNNER_API_TOKEN must be random bytes, not a repeated pattern"]);
+  return createHash("sha256").update(raw).digest();
+}
+
 // Next bundles proxy, instrumentation and pages separately; share one parsed config per process.
-const cache = globalThis as { __authConfig?: AuthConfig };
+const cache = globalThis as { __authConfig?: AuthConfig; __runnerTokenDigest?: Buffer };
 
 /** The validated config for this process. startAuth() has already exited if it is invalid. */
 export function getAuthConfig(): AuthConfig {
   cache.__authConfig ??= loadAuthConfig();
   return cache.__authConfig;
+}
+
+/** The digest of the runner token for this process. startAuth() has already exited if the token is missing or weak. */
+export function getRunnerTokenDigest(): Buffer {
+  cache.__runnerTokenDigest ??= loadRunnerToken();
+  return cache.__runnerTokenDigest;
 }

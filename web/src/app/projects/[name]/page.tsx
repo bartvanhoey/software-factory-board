@@ -35,7 +35,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ name: 
           Could not load this project: {project.error}
         </p>
       )}
-      {project.status === "disabled" && <p className="text-sm text-zinc-500">This project is disabled in its registry file.</p>}
+      {project.status === "disabled" && <p className="text-sm text-zinc-500">This project is switched off.</p>}
     </main>
   );
 }

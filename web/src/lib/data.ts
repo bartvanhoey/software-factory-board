@@ -1,14 +1,10 @@
 import "server-only";
-import { dirname, join } from "node:path";
-import { hasTests, loadProjects } from "@factory/shared";
+import { hasTests } from "@factory/shared";
+import { getDb } from "@/auth/db";
+import { listProjects } from "@/auth/projects";
 import { demoBoard } from "./demo";
 import { fetchBoards } from "./github";
 import type { BoardData, ProjectInfo } from "./types";
-
-/** Registry folder. Defaults to ../projects (the dev server runs from web/). */
-function projectsDir(): string {
-  return process.env.FACTORY_PROJECTS_DIR ?? join(dirname(process.cwd()), "projects");
-}
 
 /**
  * Board data for the page. Falls back to demo data when FACTORY_DEMO=1 or GH_TOKEN is
@@ -21,7 +17,7 @@ export async function loadBoard(): Promise<BoardData> {
   const token = process.env.GH_TOKEN;
   if (!token) return { ...demoBoard(now), demoReason: "GH_TOKEN is not set" };
 
-  const infos: ProjectInfo[] = loadProjects(projectsDir()).map((p) => ({
+  const infos: ProjectInfo[] = listProjects(getDb()).map((p) => ({
     name: p.name,
     repo: p.repo,
     defaultBranch: p.defaultBranch,

@@ -12,6 +12,10 @@ _Avoid_: Tenant, instance, organization, workspace
 A user who manages the installation: its users, its credentials and its projects.
 _Avoid_: Admin user, owner, superuser
 
+**Project manager**:
+A user who adds and edits the projects of an installation, but cannot switch a project on or set its build and test commands. An Administrator does those.
+_Avoid_: Issue admin, project admin
+
 **Member**:
 A user who can see the whole board of an installation but cannot change anything.
 _Avoid_: Viewer, regular user, guest

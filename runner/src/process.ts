@@ -50,11 +50,21 @@ function collect(child: ReturnType<typeof spawn>, label: string, opts: ProcessOp
   });
 }
 
+/**
+ * The environment for everything a lane starts (git, gh, the agent, the project's own commands). RUNNER_API_TOKEN only
+ * lets the runner fetch the project list, so none of them gets it: the agent follows instructions found in issues, and the
+ * project commands are code from the repository.
+ */
+export function childEnv(extra: NodeJS.ProcessEnv | undefined, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const { RUNNER_API_TOKEN: _token, ...rest } = base;
+  return { ...rest, ...extra };
+}
+
 /** Run a program with an argument array: no shell, so no quoting problems and no injection. */
 export function runProcess(file: string, args: readonly string[], opts: ProcessOptions = {}): Promise<ProcessResult> {
   const child = spawn(file, [...args], {
     cwd: opts.cwd,
-    env: { ...process.env, ...opts.env },
+    env: childEnv(opts.env),
     stdio: ["pipe", "pipe", "pipe"],
     shell: false,
   });
@@ -65,7 +75,7 @@ export function runProcess(file: string, args: readonly string[], opts: ProcessO
 export function runShellCommand(command: string, opts: ProcessOptions = {}): Promise<ProcessResult> {
   const child = spawn(command, {
     cwd: opts.cwd,
-    env: { ...process.env, ...opts.env },
+    env: childEnv(opts.env),
     stdio: ["pipe", "pipe", "pipe"],
     shell: true,
   });

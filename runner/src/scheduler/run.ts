@@ -76,7 +76,7 @@ export function sleepUnless(ms: number, signal: AbortSignal): Promise<void> {
 
 export interface SchedulerDeps {
   settings: SchedulerSettings;
-  loadProjects: () => Project[];
+  loadProjects: () => Promise<Project[]>;
   runLane: LaneRunner;
   events: EventLog;
   log: (message: string) => void;
@@ -105,7 +105,7 @@ export async function runScheduler(deps: SchedulerDeps): Promise<void> {
       await runPass({ loadProjects: deps.loadProjects, runLane: deps.runLane, backoff, events: deps.events, log, stopped: () => shutdown.aborted });
       lastSkip = undefined;
     } catch (e) {
-      // For example a registry file that does not validate. The next pass reads it again. Recorded once per distinct
+      // For example the web service being down or refusing the token. The next pass asks again. Recorded once per distinct
       // message, so a file left broken does not add an event every pass.
       const message = `pass skipped: ${errorMessage(e)}`;
       log(message);
