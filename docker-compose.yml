@@ -33,6 +33,8 @@ services:
       FACTORY_DATA: /data
       # Package cache on a volume, not in the 512 MB RAM-backed HOME (a NuGet restore needs about 400 MB).
       NUGET_PACKAGES: /cache/nuget
+      # The projects live in the web service (ADR 0001); RUNNER_API_TOKEN comes from .env above.
+      FACTORY_WEB_URL: http://web:2999
 
     mem_limit: 4g
     cpus: 2.0
@@ -46,7 +48,6 @@ services:
       - workspace:/workspace        # clones and worktrees
       - data:/data                  # events and logs
       - cache:/cache                # NuGet package cache, survives restarts
-      - ./projects:/app/projects:ro # registry, read-only
 
   web:
     <<: *hardened
@@ -59,7 +60,10 @@ services:
     environment:
       GH_TOKEN: ${WEB_GH_TOKEN:-}
       FACTORY_DEMO: ${FACTORY_DEMO:-}
+      # Only read once, to import projects/*.json when the project table is empty. After that the table is the registry.
       FACTORY_PROJECTS_DIR: /app/projects
+      # The secret the runner presents to fetch the projects. Listed here because web does not read .env wholesale.
+      RUNNER_API_TOKEN: ${RUNNER_API_TOKEN:-}
       # Auth settings are listed one by one, not via env_file: web must not see the runner's secrets.
       AUTH_DB_PATH: /auth/auth.db
       MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}

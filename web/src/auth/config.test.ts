@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ConfigError, loadAuthConfig } from "./config";
+import { ConfigError, loadAuthConfig, loadRunnerToken } from "./config";
 
 const KEY = Buffer.from(Array.from({ length: 32 }, (_, i) => i + 1)).toString("base64");
 const SMTP = { SMTP_HOST: "smtp.example.com", SMTP_PORT: "587", SMTP_USER: "u", SMTP_PASSWORD: "p", SMTP_FROM: "factory@example.com", APP_URL: "https://board.example.com" };
@@ -126,5 +126,42 @@ describe("loadAuthConfig", () => {
     } catch (err) {
       expect((err as Error).message).not.toContain(secret);
     }
+  });
+});
+
+describe("loadRunnerToken", () => {
+  const token = Buffer.from(Array.from({ length: 32 }, (_, i) => i + 7)).toString("base64");
+  const problem = (env: Record<string, string>): string => {
+    try {
+      loadRunnerToken(env);
+    } catch (err) {
+      if (err instanceof ConfigError) return err.problems.join(" ");
+      throw err;
+    }
+    return "";
+  };
+
+  it("accepts random bytes and keeps only a digest", () => {
+    const digest = loadRunnerToken({ RUNNER_API_TOKEN: ` ${token} ` });
+    expect(digest).toHaveLength(32);
+    expect(digest.toString("base64")).not.toContain(token);
+    expect(loadRunnerToken({ RUNNER_API_TOKEN: token }).equals(digest)).toBe(true);
+  });
+
+  it("requires it, and treats an empty value as missing", () => {
+    expect(problem({})).toMatch(/RUNNER_API_TOKEN is required/);
+    expect(problem({ RUNNER_API_TOKEN: "" })).toMatch(/is required/);
+  });
+
+  it("refuses short, non-base64 and repeated-byte tokens, without printing the value", () => {
+    const short = Buffer.alloc(31, 1).toString("base64");
+    expect(problem({ RUNNER_API_TOKEN: short })).toMatch(/at least 32 random bytes/);
+    expect(problem({ RUNNER_API_TOKEN: "hunter2 hunter2" })).toMatch(/at least 32 random bytes/);
+    expect(problem({ RUNNER_API_TOKEN: Buffer.alloc(32, 9).toString("base64") })).toMatch(/repeated pattern/);
+    expect(problem({ RUNNER_API_TOKEN: Buffer.from("abababababababababababababababab").toString("base64") })).toMatch(/repeated pattern/);
+    expect(problem({ RUNNER_API_TOKEN: Buffer.from(Array.from({ length: 32 }, (_, i) => i % 8)).toString("base64") })).toMatch(/repeated pattern/);
+    // base64 that does not round-trip is not what the generator prints (it has stray bits or missing padding)
+    expect(problem({ RUNNER_API_TOKEN: token.replace(/=+$/, "").slice(0, -1) + "B" })).toMatch(/generator command/);
+    for (const bad of [short, "hunter2 hunter2"]) expect(problem({ RUNNER_API_TOKEN: bad })).not.toContain(bad);
   });
 });

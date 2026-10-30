@@ -36,7 +36,7 @@ export function securityHeaders(nonce: string, options: CspOptions): Record<stri
   };
 }
 
-const PUBLIC_PATHS = new Set(["/login", "/register", "/verify", "/forgot-password", "/reset-password", "/api/health"]);
+const PUBLIC_PATHS = new Set(["/login", "/register", "/verify", "/forgot-password", "/reset-password", "/api/health", "/api/internal/projects"]);
 
 export type ProxyDecision = "next" | "login" | "unauthorized";
 
@@ -51,5 +51,5 @@ export function proxyDecision(pathname: string, hasSessionCookie: boolean): Prox
 
 /** Pages that show or handle credentials must never be cached. */
 export function isNoStorePath(pathname: string): boolean {
-  return pathname === "/login" || pathname.startsWith("/login/") || pathname === "/register" || pathname === "/verify" || pathname === "/forgot-password" || pathname === "/reset-password" || pathname === "/waiting" || pathname.startsWith("/account/") || pathname.startsWith("/admin/");
+  return pathname === "/login" || pathname.startsWith("/login/") || pathname === "/register" || pathname === "/verify" || pathname === "/forgot-password" || pathname === "/reset-password" || pathname === "/waiting" || pathname.startsWith("/account/") || pathname.startsWith("/admin/") || pathname.startsWith("/api/internal/");
 }

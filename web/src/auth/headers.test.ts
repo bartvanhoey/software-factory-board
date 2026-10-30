@@ -53,7 +53,7 @@ describe("securityHeaders", () => {
 
 describe("proxyDecision", () => {
   it("lets public paths through without a cookie", () => {
-    for (const p of ["/login", "/register", "/verify", "/forgot-password", "/reset-password", "/api/health"]) expect(proxyDecision(p, false)).toBe("next");
+    for (const p of ["/login", "/register", "/verify", "/forgot-password", "/reset-password", "/api/health", "/api/internal/projects"]) expect(proxyDecision(p, false)).toBe("next");
   });
 
   it("redirects pages to /login and rejects API calls without a cookie", () => {

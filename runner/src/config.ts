@@ -9,7 +9,6 @@ import type { Gh, Git } from "./ports.js";
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 export interface Settings {
-  projectsDir: string;
   dataDir: string;
   /** Where clones and worktrees live; null when neither local.json nor FACTORY_WORKSPACE says. */
   workspace: string | null;
@@ -35,7 +34,6 @@ export function loadLocalConfig(file: string): LocalConfig | null {
 export function loadSettings(env: NodeJS.ProcessEnv = process.env): Settings {
   const local = loadLocalConfig(env.FACTORY_LOCAL_CONFIG ?? join(REPO_ROOT, "local.json"));
   return {
-    projectsDir: env.FACTORY_PROJECTS_DIR ?? join(REPO_ROOT, "projects"),
     dataDir: env.FACTORY_DATA ?? join(REPO_ROOT, "data"),
     workspace: local?.workspace ?? env.FACTORY_WORKSPACE ?? null,
     local,

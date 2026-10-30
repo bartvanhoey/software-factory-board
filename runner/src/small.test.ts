@@ -174,7 +174,7 @@ describe("createEventLog", () => {
 });
 
 describe("config", () => {
-  const settings = (over: Partial<Settings> = {}): Settings => ({ projectsDir: "p", dataDir: "d", workspace: join(tmp, "ws"), local: null, ...over });
+  const settings = (over: Partial<Settings> = {}): Settings => ({ dataDir: "d", workspace: join(tmp, "ws"), local: null, ...over });
 
   it("resolves the clone as <workspace>/<repo name>, with local.json overrides first", () => {
     expect(resolveCloneDir(project(), settings())).toBe(join(tmp, "ws", "Repo"));

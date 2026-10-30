@@ -140,4 +140,27 @@ export const migrations: readonly Migration[] = [
         BEGIN DELETE FROM email_tokens WHERE user_id = NEW.id AND used_at IS NULL; END;
     `,
   },
+  {
+    version: 6,
+    name: "projects",
+    sql: `
+      -- The registry of GitHub repositories the factory works on. config holds the rest of the project as JSON and is
+      -- validated against the shared ProjectSchema on every write and read; enabled is a column so it can be filtered.
+      -- version makes a save from a stale form fail instead of overwriting a newer change.
+      CREATE TABLE projects (
+        name TEXT PRIMARY KEY CHECK (length(name) BETWEEN 1 AND 64),
+        repo TEXT NOT NULL UNIQUE COLLATE NOCASE CHECK (length(repo) BETWEEN 3 AND 200),
+        config TEXT NOT NULL,
+        enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+        version INTEGER NOT NULL DEFAULT 1,
+        created_by TEXT REFERENCES users (id),
+        created_at INTEGER NOT NULL,
+        updated_by TEXT REFERENCES users (id),
+        updated_at INTEGER NOT NULL
+      ) STRICT;
+      -- A project is switched off, never removed: its name keys the clone, the locks and the event history.
+      CREATE TRIGGER projects_no_delete BEFORE DELETE ON projects
+        BEGIN SELECT RAISE(ABORT, 'projects are disabled, never deleted'); END;
+    `,
+  },
 ];

@@ -58,7 +58,7 @@ export class Backoff {
     const paused = this.projects.get(project);
     if (paused === undefined || paused === fingerprint) return undefined;
     this.projects.delete(project);
-    return { type: "resumed", message: `${project} resumed: its registry file changed` };
+    return { type: "resumed", message: `${project} resumed: its settings changed` };
   }
 
   record(project: string, lane: Lane, outcome: Outcome, fingerprint: string, detail: string): Transition | undefined {
@@ -66,7 +66,7 @@ export class Backoff {
     if (outcome === "skip") return undefined;
     if (outcome === "pause-project") {
       this.projects.set(project, fingerprint);
-      return { type: "paused", message: `${project} paused until its registry file changes or the runner restarts: ${detail}` };
+      return { type: "paused", message: `${project} paused until its settings change in the web app or the runner restarts: ${detail}` };
     }
     const state = this.lanes.get(k);
     if (outcome === "progress") {

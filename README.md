@@ -21,7 +21,7 @@ The lanes run by hand, or automatically once you switch the scheduler on (see [T
 | `runner/` | The lane commands: `labels`, `build`, `qa`, `review` |
 | `web/` | The board and the login system (Next.js, App Router, Tailwind) |
 | `shared/` | Schemas and the project registry loader used by both |
-| `projects/` | One JSON file per target repository |
+| `projects/` | Projects to import once, when the web app starts with no projects (see [projects/README.md](projects/README.md)) |
 | `prompts/` | The builder, qa, review and rework prompts |
 | `docker/`, `docker-compose.yml` | The hardened container setup |
 | `docs/adr/`, `GLOSSARY.md` | Accepted decisions and the project's vocabulary |
@@ -42,9 +42,10 @@ Fill in `.env`:
 | `GH_TOKEN` | A token that can write issues, pull requests and contents (runner only) |
 | `WEB_GH_TOKEN` | A separate read-only token for the board. Leave it empty to see demo data |
 | `MFA_ENCRYPTION_KEY` | 32 random bytes, base64. The web container refuses to start without it |
+| `RUNNER_API_TOKEN` | 32 or more random bytes, base64. The runner uses it to fetch the projects from the web app. The web container refuses to start without it |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | The first administrator (12 to 128 characters) |
 
-Generate the key once and keep a copy outside the repository. Losing or changing it makes every stored MFA secret unreadable, and everyone must set MFA up again:
+Generate both values the same way, once each. Keep a copy of `MFA_ENCRYPTION_KEY` outside the repository: losing or changing it makes every stored MFA secret unreadable, and everyone must set MFA up again. `RUNNER_API_TOKEN` can be replaced at any time, in `.env` for both services:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
@@ -58,7 +59,7 @@ docker compose up -d --build
 
 Open <http://localhost:2999>. The first login goes through three steps: log in with `ADMIN_EMAIL` and `ADMIN_PASSWORD`, choose a new password, then set up an authenticator app and save the ten recovery codes. After the first start, remove `ADMIN_PASSWORD` from `.env`: it is only used while no administrator exists.
 
-Add a project by creating `projects/<name>.json` (see [projects/README.md](projects/README.md)) and run `npm run validate`. Then run the lanes inside the runner container:
+The projects live in the web app. The first time it starts with no projects, it imports the files in `projects/`; after that, log in as an Administrator and add, edit and switch on projects on the **Projects** screen (see [Administration](#administration)). Then run the lanes inside the runner container, or switch the scheduler on (next section):
 
 ```bash
 docker compose exec runner npm run runner -- labels --project <name>
@@ -77,8 +78,8 @@ The scheduler runs the lanes for you. It is off by default: until you set `SCHED
 Each **pass** goes through the lanes in this order: review for every project, then qa, then build. Projects go in name order and one run happens at a time. When a pass ends it waits `SCHEDULER_INTERVAL_MINUTES` (default 5) and starts the next. A single run is stopped after `SCHEDULER_RUN_TIMEOUT_MINUTES` (default 120).
 
 - **It never merges.** Review opens the pull request when it approves and a person merges it.
-- **Pausing:** set `"enabled": false` (a whole project) or `"lanes": { "qa": false }` (one lane) in `projects/<name>.json`. It is read again at every pass, so there is no restart. `docker compose stop runner` stops it.
-- **Failing lanes back off.** A build that fails, a qa or review that cannot decide, or a run that is stopped for taking too long counts as no progress. The lane then waits 5, 10 and 20 minutes, and after three in a row it is paused and tried once an hour until a run makes progress. A card that qa or review sends back is the pipeline working, not a failure. A project that is not logged in to GitHub or lacks a tool is paused until its `projects/<name>.json` changes or the runner restarts.
+- **Pausing:** switch a project off, or turn one of its lanes off, on the Projects screen. The runner asks the web app for the projects at every pass, so there is no restart. `docker compose stop runner` stops it. The web app must be running: when it is not, the pass is skipped.
+- **Failing lanes back off.** A build that fails, a qa or review that cannot decide, or a run that is stopped for taking too long counts as no progress. The lane then waits 5, 10 and 20 minutes, and after three in a row it is paused and tried once an hour until a run makes progress. A card that qa or review sends back is the pipeline working, not a failure. A project that is not logged in to GitHub or lacks a tool is paused until its settings are changed on the Projects screen or the runner restarts.
 - **Watching it:** `docker compose logs -f runner`. Pauses and resumes are also written to `data/events.jsonl` as `system` events.
 - **Stopping mid-run** (`docker compose stop`) ends the run in progress. A build stopped that way leaves its card in `building` without a result: move it back to `ready` yourself.
 
@@ -88,17 +89,18 @@ Anyone can register, but a new account sees only a "waiting for approval" page u
 
 | In this README | Role in the app | What it can do |
 | --- | --- | --- |
-| Administrator | `admin` | Everything below, plus the Users and Audit screens |
-| (not used yet) | `issue-admin` | Sees the board. It has no extra function yet |
+| Administrator | `admin` | Everything below, plus the Users and Audit screens, switching projects on and setting their commands |
+| Project manager | `issue-admin` | Sees the board, adds and edits projects, switches them off. Cannot switch one on or set its commands |
 | Member | `viewer` | Sees the whole board and changes nothing |
 
 Sessions last 8 hours idle and 7 days at most. Administrator sessions are shorter: 1 hour idle and 12 hours at most.
 
 ## Administration
 
-Administrators get an **Admin** link in the header.
+Administrators get an **Admin** link in the header, and Project managers a **Projects** link.
 
 - **Users** (`/admin/users`): give or remove roles, disable or enable an account, reset a password (a temporary one is shown once and must be changed at next login), require MFA for a user, reset a user's MFA, and mark an email address as confirmed. Accounts waiting for a role are listed first. Users are disabled, never deleted. An administrator cannot remove their own role, disable themselves or reset their own password, at least one active administrator always remains, and an administrator who has MFA cannot be demoted in the app (disable the account instead).
+- **Projects** (`/admin/projects`): the GitHub repositories the factory works on. A project has a name (fixed once created), a repository, a default branch, a stack, the lanes that run for it, limits on agent turns and automatic reworks, and a build and a test command. Administrators and Project managers can add and edit projects. **A project a Project manager adds starts switched off**, and only an Administrator can switch a project on or set its commands. A Project manager can edit a project only while it is switched off, so a project an Administrator vetted cannot be pointed at another repository: the commands run in the runner container, which holds your GitHub and Claude tokens. Anyone who can label issues in a switched-on project's repository can make the factory build, so switch a project on only for a repository you trust. A project is switched off, never removed, so its history stays. Every change is in the audit log with the old and new values.
 - **Audit log** (`/admin/audit`): who did what, newest first, filterable by action and user. It is read-only, and database triggers keep entries from being edited or deleted. It records logins, registrations, role and account changes, password and MFA resets, and every change made by the break-glass command.
 
 ## Multi-factor authentication
@@ -143,6 +145,7 @@ Access to the server is the authorisation: anyone who can run `docker exec` can 
 | Variable | Required | Default | Purpose |
 | --- | --- | --- | --- |
 | `MFA_ENCRYPTION_KEY` | yes | | Encrypts MFA secrets. Must be random bytes |
+| `RUNNER_API_TOKEN` | yes | | Lets the runner fetch the projects from the web app (at least 32 random bytes, base64) |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | first start | | Creates the first administrator when none exists |
 | `WEB_GH_TOKEN` | no | | Read-only token for the board. Empty means demo data |
 | `GH_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN` | for the runner | | Runner credentials, never given to the web container |
@@ -161,12 +164,14 @@ Built: the lane commands, the scheduler, the board, the login system described a
 Not built yet:
 
 - **The scheduler is basic.** One run at a time, a fixed interval, and no view of it in the web app. Its failure counters are in memory, so a restart clears them. A card that keeps ending without a verdict at the head of the qa or review lane is retried about once an hour (a paused lane is probed that often) and holds up the cards behind it until someone moves it.
-- **Projects are files.** They are added in `projects/*.json`, not from the web app. [ADR 0001](docs/adr/0001-runner-gets-config-from-web-over-internal-api.md) and [ADR 0002](docs/adr/0002-secrets-encrypted-in-db-master-key-outside-it.md) record the accepted direction (settings and encrypted credentials managed in the web app); none of that exists yet.
+- **Credentials are still in `.env`.** The projects are managed in the web app, but the GitHub and Claude tokens are not. [ADR 0002](docs/adr/0002-secrets-encrypted-in-db-master-key-outside-it.md) records the accepted direction (encrypted credentials set on a settings page); none of that exists yet.
+- **The runner needs the web app.** It fetches the project list from it, so no run starts while the web app is down.
 - **No network allow-list** for the runner container, which runs agent-written code.
 
 Known limits of the login system:
 
 - Resetting another account's password, resetting MFA or switching off "require MFA" does not ask the acting administrator for a fresh code, so a stolen, still-valid administrator session can do it. Those sessions are short for that reason.
+- Switching a project on or setting its commands does not ask the Administrator for a fresh password or code, so a stolen, still-valid Administrator session could make the runner execute commands of its choosing. Administrator sessions are short for that reason. The web app's database now decides what runs in the runner container, so protect it like the tokens.
 - Without a trusted proxy there is no per-IP limit, so registration and "forgot password" use shared hourly limits that a determined stranger can use up.
 - Tested against a local mail server with a self-signed certificate, not a production mail provider.
 
@@ -178,13 +183,13 @@ You need Node.js 22 or newer (the login system uses the built-in `node:sqlite`).
 npm install
 npm test                # all workspaces
 npm run typecheck
-npm run validate        # checks projects/*.json
+npm run validate        # checks the files in projects/ (the ones the web app imports once)
 ```
 
 To run the board on your machine without Docker, set the login settings and start the production build. The development server (`next dev`) has not been tried with the login system.
 
 ```bash
-export AUTH_DB_PATH="$PWD/auth.db" MFA_ENCRYPTION_KEY="<base64 key>" COOKIE_SECURE=false FACTORY_DEMO=1
+export AUTH_DB_PATH="$PWD/auth.db" MFA_ENCRYPTION_KEY="<base64 key>" RUNNER_API_TOKEN="<base64 token>" COOKIE_SECURE=false FACTORY_DEMO=1
 export ADMIN_EMAIL=you@example.com ADMIN_PASSWORD="<12 to 128 characters>"
 npm run build -w web
 npm run start -w web -- -p 3000

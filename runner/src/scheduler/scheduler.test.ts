@@ -138,7 +138,7 @@ function harness(projects: Project[], codes: (lane: Lane, project: string, n: nu
   const logs: string[] = [];
   let stopped = false;
   const deps = {
-    loadProjects: () => projects,
+    loadProjects: async () => projects,
     runLane: async (lane: Lane, name: string): Promise<RunResult> => {
       calls.push(`${lane}:${name}`);
       const r = codes(lane, name, calls.length);
@@ -218,7 +218,7 @@ describe("runScheduler", () => {
     const events: NewEvent[] = [];
     await runScheduler({
       settings,
-      loadProjects: () => [project("a", { lanes: { review: false, qa: false } })],
+      loadProjects: async () => [project("a", { lanes: { review: false, qa: false } })],
       runLane: async (lane, name) => (calls.push(`${lane}:${name}`), ok),
       events: { append: (e) => void events.push(e) },
       log: () => undefined,
@@ -239,7 +239,7 @@ describe("runScheduler", () => {
     let reads = 0;
     await runScheduler({
       settings,
-      loadProjects: () => {
+      loadProjects: async () => {
         if (++reads === 1) throw new Error("projects/a.json: bad");
         return [];
       },
@@ -261,7 +261,7 @@ describe("runScheduler", () => {
     let passes = 0;
     await runScheduler({
       settings,
-      loadProjects: () => {
+      loadProjects: async () => {
         throw new Error("projects/a.json: bad");
       },
       runLane: async () => ok,
@@ -281,7 +281,7 @@ describe("runScheduler", () => {
     let ran = false;
     const done = runScheduler({
       settings: { ...settings, enabled: false },
-      loadProjects: () => ((ran = true), []),
+      loadProjects: async () => ((ran = true), []),
       runLane: async () => ((ran = true), ok),
       events: { append: () => undefined },
       log: (m) => void logs.push(m),
@@ -335,7 +335,7 @@ describe("childLaneRunner", () => {
 
 describe("the real command", () => {
   const bin = join(REPO_ROOT, "runner", "src", "bin.ts");
-  const env = { ...process.env, SCHEDULER_ENABLED: "false", FACTORY_PROJECTS_DIR: join(REPO_ROOT, "projects"), FACTORY_DATA: join(tmpdir(), "factory-sched-test") };
+  const env = { ...process.env, SCHEDULER_ENABLED: "false", FACTORY_DATA: join(tmpdir(), "factory-sched-test") };
 
   it("stays alive while the scheduler is off, and exits cleanly on SIGTERM", async () => {
     const child = spawn(process.execPath, ["--import", "tsx", bin, "schedule"], { env, stdio: "ignore", cwd: REPO_ROOT });
