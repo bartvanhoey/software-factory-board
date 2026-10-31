@@ -17,7 +17,14 @@ A person always does the final merge. The web application sits behind a login, s
 
 ## Getting Started
 
-1. Create a file named `.env` in the project root with the variables below. This is the minimum; `.env.example` lists the optional ones.
+1. Clone the repository and go into its folder, the project root:
+
+   ```bash
+   git clone https://github.com/bartvanhoey/software-factory-board.git
+   cd software-factory-board
+   ```
+
+2. Create a file named `.env` in the project root with the variables below. This is the minimum; `.env.example` lists the optional ones.
 
    ```bash
    # Random secrets, one value each: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
@@ -62,15 +69,17 @@ A person always does the final merge. The web application sits behind a login, s
 
    The board token must never be able to write: it only displays what is on GitHub.
 
-2. Start it:
+3. Start it from the project root, the folder that contains `docker-compose.yml` and your `.env` file:
 
    ```bash
    docker compose up -d --build
    ```
 
-3. Open <http://localhost:2999> and log in with the administrator you set. You will be asked to choose a new password.
+   Run every later `docker compose` command from this same folder.
 
-4. Add your GitHub repositories on the **Projects** screen and switch them on.
+4. Open <http://localhost:2999> and log in with the administrator you set. You will be asked to choose a new password.
+
+5. Add your GitHub repositories on the **Projects** screen and switch them on.
 
 The scheduler is switched on in the example above, so the factory builds `ready` issues of every switched-on project by itself. To stop that, set `SCHEDULER_ENABLED=false` in `.env` and run `docker compose up -d`.
 
