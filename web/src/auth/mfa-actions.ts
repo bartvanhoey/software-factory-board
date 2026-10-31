@@ -78,7 +78,7 @@ export async function disableOwnMfaAction(_prev: MfaState, form: FormData): Prom
     return failed(err);
   }
   if (!result.ok) return { error: result.error };
-  redirect("/account/mfa");
+  redirect("/account/mfa?off=1");
 }
 
 export async function regenerateRecoveryCodesAction(_prev: MfaState, form: FormData): Promise<MfaState> {

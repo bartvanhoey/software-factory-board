@@ -9,8 +9,11 @@ import { CodeForm } from "@/components/auth/CodeForm";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "MFA · Software Factory Board" };
 
-export default async function MfaPage() {
+const primary = "inline-block rounded bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300";
+
+export default async function MfaPage({ searchParams }: { searchParams: Promise<{ off?: string }> }) {
   const session = await requireState("/account/mfa");
+  const justTurnedOff = !session.mfaEnabled && (await searchParams).off === "1";
   const left = session.mfaEnabled ? recoveryCodesLeft(getDb(), session.userId) : 0;
   const isAdmin = session.roles.includes("admin");
 
@@ -18,12 +21,24 @@ export default async function MfaPage() {
     <AuthCard title="Multi-factor authentication">
       {!session.mfaEnabled ? (
         <>
+          {justTurnedOff && (
+            <p role="status" className="mb-4 rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+              MFA is turned off. Your other sessions have ended.
+            </p>
+          )}
           <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
             MFA is <strong>off</strong>. With it on, you also enter a code from an authenticator app each time you log in.
           </p>
-          <Link href="/account/mfa/setup" className="inline-block rounded bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300">
-            Turn on MFA
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            {justTurnedOff && (
+              <Link href="/" className={primary}>
+                Go to the board
+              </Link>
+            )}
+            <Link href="/account/mfa/setup" className={justTurnedOff ? "inline-block rounded border border-zinc-300 px-3 py-2 text-sm font-medium dark:border-zinc-700" : primary}>
+              Turn on MFA
+            </Link>
+          </div>
         </>
       ) : (
         <div className="space-y-8">
