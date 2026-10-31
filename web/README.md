@@ -1,13 +1,13 @@
 # Web dashboard
 
 Board of the factory's issue processing across all projects registered in the web app. The board only reads GitHub; it changes nothing there.
-It sits behind a login (roles, MFA, admin and audit screens), described in the [root README](../README.md).
+It sits behind a login (roles, MFA, admin and audit screens), described in the [project description](../docs/project-description.md).
 Next.js (App Router) + Tailwind. GitHub is read with plain `fetch` against the GraphQL API, no client library.
 
 ## Run
 
 In Docker it is part of `docker compose up` and listens on http://localhost:2999. Set `BOARD_GITHUB_TOKEN` and the login
-settings in the root `.env` (see the [root README](../README.md) and `docker/README.md`).
+settings in the root `.env` (see the [project description](../docs/project-description.md) and `docker/README.md`).
 
 Without Docker, the web app refuses to start unless the login settings are present. Use the production build
 (the development server `next dev` has not been tried with the login system):
@@ -31,7 +31,7 @@ For live data, set `BOARD_GITHUB_TOKEN` (and drop `FACTORY_DEMO`); without it th
 | `FACTORY_DEMO` | | `1` forces demo data |
 | `FACTORY_PROJECTS_DIR` | `../projects` | folder whose `*.json` files are imported once, when the project table is empty |
 | `RUNNER_API_TOKEN` | | required: the secret the runner presents to `GET /api/internal/projects` (at least 32 random bytes, base64) |
-| `AUTH_DB_PATH`, `MFA_ENCRYPTION_KEY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `COOKIE_SECURE`, ... | | login settings, see the configuration reference in the [root README](../README.md) |
+| `AUTH_DB_PATH`, `MFA_ENCRYPTION_KEY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `COOKIE_SECURE`, ... | | login settings, see the configuration reference in the [project description](../docs/project-description.md) |
 
 ## Board
 
