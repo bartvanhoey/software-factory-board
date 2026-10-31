@@ -189,7 +189,7 @@ export async function fetchBoards(
       // Next.js data cache; ignored outside Next.
       next: { revalidate: REVALIDATE_SECONDS },
     } as RequestInit);
-    if (res.status === 401) return failAll("GitHub rejected the token (401). Check GH_TOKEN.");
+    if (res.status === 401) return failAll("GitHub rejected the token (401). Check BOARD_GITHUB_TOKEN.");
     if (!res.ok) return failAll(`GitHub returned HTTP ${res.status}.`);
     json = await res.json();
   } catch (e) {

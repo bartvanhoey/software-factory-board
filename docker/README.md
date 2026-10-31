@@ -6,7 +6,7 @@ versions and then runs the given command.
 ## Use
 
 ```
-cp .env.example .env        # fill in GH_TOKEN and ANTHROPIC_API_KEY
+cp .env.example .env        # fill in RUNNER_GITHUB_TOKEN and ANTHROPIC_API_KEY
 docker compose build
 docker compose run --rm --no-deps runner true   # prints toolchain versions
 bash docker/smoke.sh                            # verifies the hardening
@@ -20,14 +20,14 @@ Both run the same image.
 
 | Service | Command | Notes |
 | --- | --- | --- |
-| `runner` | `runner schedule` (idle unless `SCHEDULER_ENABLED=true`) | gets `.env` (`GH_TOKEN`, `ANTHROPIC_API_KEY`, `RUNNER_API_TOKEN`) and fetches the projects from `web`; run lanes with `docker compose exec runner npm run runner -- ...`, see `runner/README.md` |
+| `runner` | `runner schedule` (idle unless `SCHEDULER_ENABLED=true`) | gets `.env` (`RUNNER_GITHUB_TOKEN`, `ANTHROPIC_API_KEY`, `RUNNER_API_TOKEN`) and fetches the projects from `web`; run lanes with `docker compose exec runner npm run runner -- ...`, see `runner/README.md` |
 | `web` | `next start` on port 2999 | dashboard at http://localhost:2999, bound to `127.0.0.1` only |
 
 The dashboard has a login, but it is served over plain http, so the port is published on localhost only. To expose it
 beyond localhost, put a TLS proxy in front first (then set `COOKIE_SECURE=true`), and only then change the port mapping.
 
-`web` never receives the runner's `GH_TOKEN` (it can write) or `ANTHROPIC_API_KEY`. It reads
-`WEB_GH_TOKEN` from `.env`, which should be a read-only token. Leave it empty to see demo data.
+`web` never receives the runner's `RUNNER_GITHUB_TOKEN` (it can write) or `ANTHROPIC_API_KEY`. It reads
+`BOARD_GITHUB_TOKEN` from `.env`, which should be a read-only token. Leave it empty to see demo data.
 Its code is baked into the image, so rebuild after changes: `docker compose up -d --build`.
 
 ## Dashboard login settings

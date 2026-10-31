@@ -6,7 +6,7 @@ Next.js (App Router) + Tailwind. GitHub is read with plain `fetch` against the G
 
 ## Run
 
-In Docker it is part of `docker compose up` and listens on http://localhost:2999. Set `WEB_GH_TOKEN` and the login
+In Docker it is part of `docker compose up` and listens on http://localhost:2999. Set `BOARD_GITHUB_TOKEN` and the login
 settings in the root `.env` (see the [root README](../README.md) and `docker/README.md`).
 
 Without Docker, the web app refuses to start unless the login settings are present. Use the production build
@@ -23,11 +23,11 @@ npm run start -w web -- -p 3000
 Open http://localhost:3000 and log in as `ADMIN_EMAIL`. The first login goes through three steps before the board
 shows: choose a new password, set up an authenticator app, and save the ten recovery codes. Generate each key with
 `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`.
-For live data, set `GH_TOKEN` (and drop `FACTORY_DEMO`); without it the page shows demo data and says so in a banner.
+For live data, set `BOARD_GITHUB_TOKEN` (and drop `FACTORY_DEMO`); without it the page shows demo data and says so in a banner.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `GH_TOKEN` | | read access (issues, pull requests, checks) to every registered project's repo. In Docker this is `WEB_GH_TOKEN` |
+| `BOARD_GITHUB_TOKEN` | | read access (issues, pull requests, checks) to every registered project's repo. |
 | `FACTORY_DEMO` | | `1` forces demo data |
 | `FACTORY_PROJECTS_DIR` | `../projects` | folder whose `*.json` files are imported once, when the project table is empty |
 | `RUNNER_API_TOKEN` | | required: the secret the runner presents to `GET /api/internal/projects` (at least 32 random bytes, base64) |

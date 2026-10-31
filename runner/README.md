@@ -21,7 +21,7 @@ docker compose exec runner npm run runner -- review --project <name> [--issue <n
 
 - `--dry-run` runs every read (labels, issues, fetch, an initial clone) and only prints the calls that
   would change GitHub or the repo. It skips the agent and the tests and writes no events.
-- Needs `GH_TOKEN` (write access to the repo's issues, pull requests and contents) and, for `build`,
+- Needs `RUNNER_GITHUB_TOKEN` (write access to the repo's issues, pull requests and contents) and, for `build`,
   `ANTHROPIC_API_KEY`, both from the root `.env`.
 - The projects come from the web app, not from files (ADR 0001): every command fetches the list from
   `FACTORY_WEB_URL` (default `http://web:2999`) with `RUNNER_API_TOKEN` as a bearer token. A missing token is a usage

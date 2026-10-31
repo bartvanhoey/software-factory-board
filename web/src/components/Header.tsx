@@ -39,7 +39,7 @@ export function DemoBanner({ board }: { board: BoardData }) {
       className="mb-6 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
     >
       Showing demo data ({board.demoReason}). Set{" "}
-      <code className="font-mono">GH_TOKEN</code> in{" "}
+      <code className="font-mono">BOARD_GITHUB_TOKEN</code> in{" "}
       <code className="font-mono">web/.env.local</code> to see the projects in{" "}
       <code className="font-mono">projects/</code>.
     </p>

@@ -35,6 +35,8 @@ services:
       NUGET_PACKAGES: /cache/nuget
       # The projects live in the web service (ADR 0001); RUNNER_API_TOKEN comes from .env above.
       FACTORY_WEB_URL: http://web:2999
+      # The gh CLI only reads GH_TOKEN, so the runner's token is handed to it under that name.
+      GH_TOKEN: ${RUNNER_GITHUB_TOKEN:-}
 
     mem_limit: 4g
     cpus: 2.0
@@ -56,9 +58,9 @@ services:
     command: ["npm", "run", "start", "-w", "web", "--", "-p", "2999", "-H", "0.0.0.0"]
 
     # Read-only dashboard. It gets its own read-only token, never the runner's
-    # GH_TOKEN (which can write) or ANTHROPIC_API_KEY. Empty token = demo data.
+    # RUNNER_GITHUB_TOKEN (which can write) or ANTHROPIC_API_KEY. Empty token = demo data.
     environment:
-      GH_TOKEN: ${WEB_GH_TOKEN:-}
+      BOARD_GITHUB_TOKEN: ${BOARD_GITHUB_TOKEN:-}
       FACTORY_DEMO: ${FACTORY_DEMO:-}
       # Only read once, to import projects/*.json when the project table is empty. After that the table is the registry.
       FACTORY_PROJECTS_DIR: /app/projects
