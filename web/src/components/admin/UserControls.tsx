@@ -73,6 +73,16 @@ export function UserControls({
   const [resetMfaState, resetMfaFormAction, resetMfaPending] = useActionState(resetMfaAction, {});
   const [emailState, emailAction, emailPending] = useActionState(markEmailVerifiedAction, {});
   const isAdmin = roles.includes("admin");
+  const requireForm = (
+    <form action={requireAction}>
+      <input type="hidden" name="userId" value={id} />
+      <input type="hidden" name="required" value={mfaRequired ? "false" : "true"} />
+      <button type="submit" disabled={requirePending} className={button}>
+        {mfaRequired ? "Stop requiring MFA" : "Require MFA"}
+      </button>
+      <Feedback state={requireState} />
+    </form>
+  );
 
   return (
     <div className="space-y-2">
@@ -101,7 +111,10 @@ export function UserControls({
       </form>
 
       {isSelf ? (
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">This is you: you cannot remove your own admin role, disable yourself or reset your own password here.</p>
+        <div className="space-y-2">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">This is you: you cannot remove your own admin role, disable yourself or reset your own password here.</p>
+          {requireForm}
+        </div>
       ) : (
         <div className="flex flex-wrap gap-2">
           <form action={disableAction}>
@@ -128,14 +141,7 @@ export function UserControls({
               <Feedback state={emailState} />
             </form>
           )}
-          <form action={requireAction}>
-            <input type="hidden" name="userId" value={id} />
-            <input type="hidden" name="required" value={mfaRequired ? "false" : "true"} />
-            <button type="submit" disabled={requirePending} className={button}>
-              {mfaRequired ? "Stop requiring MFA" : "Require MFA"}
-            </button>
-            <Feedback state={requireState} />
-          </form>
+          {requireForm}
           {isAdmin ? (
             <p className="basis-full text-xs text-zinc-500 dark:text-zinc-400">An admin&apos;s MFA can only be reset from the server: <code className="font-mono">{BREAKGLASS_RESET_MFA}</code>
             </p>
