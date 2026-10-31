@@ -12,26 +12,26 @@ export async function UserMenu() {
   const isManager = !isAdmin && hasRole(session.roles, "issue-admin");
   const pending = isAdmin ? countPending(getDb()) : 0;
   return (
-    <div className="flex items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400">
-      <span>{session.email}</span>
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-600 dark:text-zinc-400">
+      <span className="basis-full max-sm:break-all sm:basis-auto">{session.email}</span>
       {isAdmin && (
-        <Link href="/admin/users" className="hover:underline">
+        <Link href="/admin/users" className="whitespace-nowrap py-1.5 hover:underline">
           Admin{pending > 0 ? ` (${pending} pending)` : ""}
         </Link>
       )}
       {isManager && (
-        <Link href="/admin/projects" className="hover:underline">
+        <Link href="/admin/projects" className="whitespace-nowrap py-1.5 hover:underline">
           Projects
         </Link>
       )}
-      <Link href="/account/mfa" className="hover:underline">
+      <Link href="/account/mfa" className="whitespace-nowrap py-1.5 hover:underline">
         MFA
       </Link>
-      <Link href="/account/password" className="hover:underline">
+      <Link href="/account/password" className="whitespace-nowrap py-1.5 hover:underline">
         Password
       </Link>
       <form action={logoutAction}>
-        <button type="submit" className="hover:underline">
+        <button type="submit" className="whitespace-nowrap py-1.5 hover:underline">
           Log out
         </button>
       </form>

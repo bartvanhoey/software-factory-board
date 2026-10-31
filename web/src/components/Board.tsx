@@ -84,7 +84,7 @@ export function Board({ issues, now }: { issues: readonly BoardIssue[]; now: Dat
         <section
           key={lane}
           aria-labelledby={`lane-${lane}`}
-          className="min-w-72 flex-1 snap-start rounded-xl bg-zinc-100 p-3 dark:bg-zinc-900/60"
+          className="min-w-[85%] flex-1 snap-start rounded-xl bg-zinc-100 p-3 sm:min-w-72 dark:bg-zinc-900/60"
         >
           <header className="mb-3">
             <h2 id={`lane-${lane}`} className="flex items-center justify-between text-sm font-semibold">

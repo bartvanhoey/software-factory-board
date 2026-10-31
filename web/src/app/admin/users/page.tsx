@@ -15,6 +15,9 @@ const statusStyle = {
   disabled: "bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200",
 };
 
+/** On a phone each row is a card and each cell shows its column name (from data-label) in front of its value. */
+const cell = "max-md:flex max-md:gap-3 max-md:py-1 max-md:pr-0 max-md:before:w-20 max-md:before:shrink-0 max-md:before:text-xs max-md:before:uppercase max-md:before:text-zinc-500 max-md:before:content-[attr(data-label)]";
+
 export default async function UsersPage() {
   const admin = await requireAccess("admin");
   const { users, pending } = listUsers(getDb(), admin.userId);
@@ -28,9 +31,9 @@ export default async function UsersPage() {
         Admin includes issue-admin and viewer; issue-admin includes viewer.
       </p>
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
+        <table className="w-full text-left text-sm max-md:block">
           <caption className="sr-only">All accounts, accounts waiting for a role first</caption>
-          <thead className="text-xs uppercase text-zinc-500 dark:text-zinc-400">
+          <thead className="text-xs uppercase text-zinc-500 max-md:sr-only dark:text-zinc-400">
             <tr>
               <th scope="col" className="py-2 pr-4">Account</th>
               <th scope="col" className="py-2 pr-4">Status</th>
@@ -40,20 +43,22 @@ export default async function UsersPage() {
               <th scope="col" className="py-2">Roles and actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="max-md:block">
             {users.map((u) => (
-              <tr key={u.id} className="border-t border-zinc-200 align-top dark:border-zinc-800">
-                <th scope="row" className="py-3 pr-4 font-medium">{u.email}</th>
-                <td className="py-3 pr-4">
+              <tr key={u.id} className="border-t border-zinc-200 align-top max-md:mb-3 max-md:block max-md:rounded-lg max-md:border max-md:p-3 dark:border-zinc-800">
+                <th scope="row" className="py-3 pr-4 font-medium max-md:block max-md:break-all max-md:py-1 max-md:pr-0">{u.email}</th>
+                <td data-label="Status" className={`py-3 pr-4 ${cell}`}>
                   <span className={`rounded px-2 py-0.5 text-xs ${statusStyle[u.status]}`}>{u.status}</span>
                 </td>
-                <td className="py-3 pr-4 text-zinc-600 dark:text-zinc-400">
-                  {u.mfaEnabled ? "on" : "off"}
-                  {u.mfaRequired ? " · required" : ""}
+                <td data-label="MFA" className={`py-3 pr-4 text-zinc-600 dark:text-zinc-400 ${cell}`}>
+                  <span>
+                    {u.mfaEnabled ? "on" : "off"}
+                    {u.mfaRequired ? " · required" : ""}
+                  </span>
                 </td>
-                {emailVerification && <td className="py-3 pr-4 text-zinc-600 dark:text-zinc-400">{u.emailVerified ? "confirmed" : "not confirmed"}</td>}
-                <td className="py-3 pr-4 text-zinc-600 dark:text-zinc-400">{day(u.createdAt)}</td>
-                <td className="py-3">
+                {emailVerification && <td data-label="Email" className={`py-3 pr-4 text-zinc-600 dark:text-zinc-400 ${cell}`}>{u.emailVerified ? "confirmed" : "not confirmed"}</td>}
+                <td data-label="Created" className={`py-3 pr-4 text-zinc-600 dark:text-zinc-400 ${cell}`}>{day(u.createdAt)}</td>
+                <td className="py-3 max-md:block max-md:pb-0 max-md:pt-2">
                   <UserControls
                     id={u.id}
                     email={u.email}
