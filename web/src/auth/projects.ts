@@ -9,7 +9,7 @@ import { transaction } from "./db";
 import { findUserById, hasRole, rolesOf } from "./users";
 
 /** A project as stored: the shared Project plus the bookkeeping the screen needs. */
-export type ProjectRecord = Project & { version: number; createdAt: number; updatedAt: number };
+export type ProjectRecord = Project & { version: number; createdAt: number; updatedAt: number; archivedAt: number | null };
 
 const NOT_ALLOWED = "Project manager or Administrator access is required.";
 const ADMIN_ONLY_COMMANDS = "Only an Administrator can set the build and test commands.";
@@ -20,6 +20,10 @@ const NOT_FOUND = "Project not found.";
 const DUPLICATE_NAME = "A project with this name already exists.";
 const DUPLICATE_REPO = "This repository is already registered as a project.";
 const SWITCH_OFF_FIRST = "Only an Administrator can change a project that is switched on. Switch it off first, make the change, and ask an Administrator to switch it on again.";
+const ARCHIVED = "This project is archived. Restore it first.";
+const ONLY_ADMIN_ARCHIVE = "Only an Administrator can archive or restore a project.";
+const SWITCH_OFF_TO_ARCHIVE = "Switch the project off before archiving it.";
+const IN_ARCHIVE = " It is in the archive: restore it instead.";
 /** Projects are never deleted, so the table is capped: one account cannot fill it and the runner's list with junk. */
 export const MAX_PROJECTS = 200;
 const TOO_MANY = `There are already ${MAX_PROJECTS} projects.`;
@@ -43,14 +47,17 @@ interface Row {
   version: number;
   created_at: number;
   updated_at: number;
+  archived_at: number | null;
 }
+
+const COLUMNS = "name, repo, config, enabled, version, created_at, updated_at, archived_at";
 
 const reported = new Set<string>();
 
 function fromRow(row: Row): ProjectRecord | null {
   try {
     const project = ProjectSchema.parse({ ...(JSON.parse(row.config) as object), name: row.name, repo: row.repo, enabled: row.enabled === 1 });
-    return { ...project, version: row.version, createdAt: row.created_at, updatedAt: row.updated_at };
+    return { ...project, version: row.version, createdAt: row.created_at, updatedAt: row.updated_at, archivedAt: row.archived_at };
   } catch {
     // One damaged row must not take the board, the API and every lane down with it. Said once, not on every request.
     if (!reported.has(row.name)) {
@@ -61,13 +68,15 @@ function fromRow(row: Row): ProjectRecord | null {
   }
 }
 
-export function listProjects(db: DatabaseSync): ProjectRecord[] {
-  const rows = db.prepare("SELECT name, repo, config, enabled, version, created_at, updated_at FROM projects ORDER BY name").all() as unknown as Row[];
+/** The projects in use, or with `archived` the ones in the archive. */
+export function listProjects(db: DatabaseSync, archived = false): ProjectRecord[] {
+  const rows = db.prepare(`SELECT ${COLUMNS} FROM projects WHERE archived_at IS ${archived ? "NOT " : ""}NULL ORDER BY name`).all() as unknown as Row[];
   return rows.map(fromRow).filter((p): p is ProjectRecord => p !== null);
 }
 
+/** One project by name, archived or not. */
 export function getProject(db: DatabaseSync, name: string): ProjectRecord | undefined {
-  const row = db.prepare("SELECT name, repo, config, enabled, version, created_at, updated_at FROM projects WHERE name = ?").get(name) as Row | undefined;
+  const row = db.prepare(`SELECT ${COLUMNS} FROM projects WHERE name = ?`).get(name) as Row | undefined;
   return row ? (fromRow(row) ?? undefined) : undefined;
 }
 
@@ -159,8 +168,9 @@ export function createProject(db: DatabaseSync, actorId: string, raw: unknown, c
       );
     } catch (err) {
       if (!isUnique(err)) throw err;
-      const nameTaken = db.prepare("SELECT 1 AS taken FROM projects WHERE name = ?").get(project.name) !== undefined;
-      return { ok: false, error: nameTaken ? DUPLICATE_NAME : DUPLICATE_REPO };
+      const byName = db.prepare("SELECT archived_at FROM projects WHERE name = ?").get(project.name) as { archived_at: number | null } | undefined;
+      const inArchive = byName ? byName.archived_at !== null : (db.prepare("SELECT archived_at FROM projects WHERE repo = ?").get(project.repo) as { archived_at: number | null }).archived_at !== null;
+      return { ok: false, error: (byName ? DUPLICATE_NAME : DUPLICATE_REPO) + (inArchive ? IN_ARCHIVE : "") };
     }
     audit(db, { action: "project.created", actor: actorId, ip: ctx.ip, detail: { name: project.name, ...detailOf(project) } }, now);
     return { ok: true, name: project.name };
@@ -178,6 +188,7 @@ export function updateProject(db: DatabaseSync, actorId: string, name: string, r
     if (!level) return deny(db, actorId, "project.update", ctx, NOT_ALLOWED);
     const current = getProject(db, name);
     if (!current) return { ok: false, error: NOT_FOUND };
+    if (current.archivedAt !== null) return { ok: false, error: ARCHIVED };
     const parsed = parse(raw);
     if (!parsed.ok) return parsed;
     const next = parsed.project;
@@ -219,8 +230,28 @@ export function updateProject(db: DatabaseSync, actorId: string, name: string, r
 export function setProjectEnabled(db: DatabaseSync, actorId: string, name: string, enabled: boolean, expectedVersion: number, ctx: AdminCtx): Done {
   const current = getProject(db, name);
   if (!current) return { ok: false, error: NOT_FOUND };
-  const { version: _version, createdAt: _c, updatedAt: _u, ...project } = current;
+  const { version: _version, createdAt: _c, updatedAt: _u, archivedAt: _a, ...project } = current;
   return updateProject(db, actorId, name, { ...project, enabled }, expectedVersion, ctx);
+}
+
+/**
+ * Archives a project (Administrator only), or restores it from the archive. Only a switched-off project can be archived,
+ * and a restored one stays off until an Administrator switches it on. The row, and so the name and repository, is kept.
+ */
+export function setProjectArchived(db: DatabaseSync, actorId: string, name: string, archived: boolean, expectedVersion: number, ctx: AdminCtx): Done {
+  const attempted = archived ? "project.archive" : "project.restore";
+  const now = ctx.now ?? Date.now();
+  return transaction(db, (): Done => {
+    if (levelOf(db, actorId) !== "admin") return deny(db, actorId, attempted, ctx, ONLY_ADMIN_ARCHIVE);
+    const current = getProject(db, name);
+    if (!current) return { ok: false, error: NOT_FOUND };
+    if (current.version !== expectedVersion) return { ok: false, error: STALE };
+    if ((current.archivedAt !== null) === archived) return { ok: true };
+    if (archived && current.enabled) return { ok: false, error: SWITCH_OFF_TO_ARCHIVE };
+    db.prepare("UPDATE projects SET archived_at = ?, version = version + 1, updated_by = ?, updated_at = ? WHERE name = ?").run(archived ? now : null, actorId, now, name);
+    audit(db, { action: archived ? "project.archived" : "project.restored", actor: actorId, ip: ctx.ip, detail: { name } }, now);
+    return { ok: true };
+  });
 }
 
 export interface ImportResult {

@@ -15,8 +15,8 @@ export function isRunner(authorization: string | null, expectedDigest: Buffer): 
   return given.length === expectedDigest.length && timingSafeEqual(given, expectedDigest);
 }
 
-/** Every project, disabled ones included (a lane command says "disabled" rather than "unknown project"). No bookkeeping fields. */
+/** Every project in use, disabled ones included (a lane command says "disabled" rather than "unknown project"); archived ones are left out. No bookkeeping fields. */
 export function projectsPayload(db: DatabaseSync): ProjectsResponse {
-  const projects = listProjects(db).map(({ version: _v, createdAt: _c, updatedAt: _u, ...project }) => project);
+  const projects = listProjects(db).map(({ version: _v, createdAt: _c, updatedAt: _u, archivedAt: _a, ...project }) => project);
   return ProjectsResponseSchema.parse({ projects });
 }

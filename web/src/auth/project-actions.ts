@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { denyNonAdmin, type AdminCtx, type Done } from "./admin";
 import { requestContext, requireAccess, type AppSession } from "./dal";
 import { getDb } from "./db";
-import { createProject, getProject, setProjectEnabled, updateProject } from "./projects";
+import { createProject, getProject, setProjectArchived, setProjectEnabled, updateProject } from "./projects";
 import { hasRole } from "./users";
 
 export interface ProjectState {
@@ -109,6 +109,16 @@ export async function saveProjectAction(_prev: ProjectState, form: FormData): Pr
     // prompt paths (the switch has its own button).
     const raw = { ...fields(form), enabled: current.enabled, prompts: current.prompts, commands: a.isAdmin ? commandsOf(form) : current.commands };
     return finish(updateProject(getDb(), a.session.userId, name, raw, version(form), a.ctx), "Saved.", form);
+  } catch (err) {
+    return failed(err, form);
+  }
+}
+
+export async function setProjectArchivedAction(_prev: ProjectState, form: FormData): Promise<ProjectState> {
+  const a = await actor("project.archive");
+  const archive = form.get("archived") === "true";
+  try {
+    return finish(setProjectArchived(getDb(), a.session.userId, text(form, "name"), archive, version(form), a.ctx), archive ? "Archived." : "Restored. It is switched off.", form);
   } catch (err) {
     return failed(err, form);
   }
