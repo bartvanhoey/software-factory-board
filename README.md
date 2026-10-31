@@ -1,5 +1,7 @@
 # Software Factory
 
+[![CI](https://github.com/bartvanhoey/software-factory-board/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/bartvanhoey/software-factory-board/actions/workflows/ci.yml)
+
 A software factory that runs in a Docker container and uses Claude Code to turn GitHub issues into pull requests.
 The factory comes with a web application that shows:
 
