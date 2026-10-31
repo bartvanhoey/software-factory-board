@@ -9,11 +9,11 @@ function hrefFor(selected: readonly string[]): string {
 
 export function ProjectChips({ projects, selected }: { projects: readonly ProjectResult[]; selected: readonly string[] }) {
   return (
-    <nav aria-label="Filter by project" className="mb-4 flex flex-wrap gap-2">
+    <nav aria-label="Filter by project" className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
       <Link
         href="/"
         aria-current={selected.length === 0 ? "true" : undefined}
-        className={`rounded-full border px-3 py-1 text-sm ${
+        className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-2 text-sm sm:py-1 ${
           selected.length === 0
             ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
             : "border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
@@ -29,7 +29,7 @@ export function ProjectChips({ projects, selected }: { projects: readonly Projec
             key={p.info.name}
             href={hrefFor(toggleProject(selected, p.info.name))}
             aria-current={isSelected ? "true" : undefined}
-            className={`flex items-center gap-2 rounded-full border px-3 py-1 text-sm ${
+            className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3 py-2 text-sm sm:py-1 ${
               isSelected
                 ? "border-zinc-900 bg-zinc-100 dark:border-zinc-100 dark:bg-zinc-800"
                 : "border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"

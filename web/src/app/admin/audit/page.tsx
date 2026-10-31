@@ -11,6 +11,9 @@ type Params = { action?: string | string[]; user?: string | string[]; before?: s
 const first = (v: string | string[] | undefined): string | undefined => (Array.isArray(v) ? v[0] : v);
 const stamp = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace("T", " ");
 
+/** On a phone each row is a card and each cell shows its column name (from data-label) in front of its value. */
+const cell = "max-md:flex max-md:gap-3 max-md:py-1 max-md:pr-0 max-md:before:w-20 max-md:before:shrink-0 max-md:before:text-xs max-md:before:uppercase max-md:before:text-zinc-500 max-md:before:content-[attr(data-label)]";
+
 export default async function AuditPage({ searchParams }: { searchParams: Promise<Params> }) {
   const admin = await requireAccess("admin");
   const params = await searchParams;
@@ -52,9 +55,9 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
       </form>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
+        <table className="w-full text-left text-sm max-md:block">
           <caption className="sr-only">Audit log entries, newest first</caption>
-          <thead className="text-xs uppercase text-zinc-500 dark:text-zinc-400">
+          <thead className="text-xs uppercase text-zinc-500 max-md:sr-only dark:text-zinc-400">
             <tr>
               <th scope="col" className="py-2 pr-4">Time (UTC)</th>
               <th scope="col" className="py-2 pr-4">Action</th>
@@ -64,15 +67,15 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
               <th scope="col" className="py-2">Details</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="max-md:block">
             {items.map((i) => (
-              <tr key={i.id} className="border-t border-zinc-200 align-top dark:border-zinc-800">
-                <td className="whitespace-nowrap py-2 pr-4 text-zinc-600 dark:text-zinc-400">{stamp(i.at)}</td>
-                <td className="py-2 pr-4 font-mono text-xs">{i.action}</td>
-                <td className="py-2 pr-4">{i.actor ?? "-"}</td>
-                <td className="py-2 pr-4">{i.target ?? "-"}</td>
-                <td className="py-2 pr-4">{i.ip ?? "-"}</td>
-                <td className="py-2 font-mono text-xs text-zinc-600 dark:text-zinc-400">{i.detail ?? ""}</td>
+              <tr key={i.id} className="border-t border-zinc-200 align-top max-md:mb-3 max-md:block max-md:rounded-lg max-md:border max-md:p-3 dark:border-zinc-800">
+                <td data-label="Time" className={`whitespace-nowrap py-2 pr-4 text-zinc-600 dark:text-zinc-400 ${cell}`}>{stamp(i.at)}</td>
+                <td data-label="Action" className={`py-2 pr-4 font-mono text-xs ${cell}`}>{i.action}</td>
+                <td data-label="Actor" className={`py-2 pr-4 max-md:break-all ${cell}`}>{i.actor ?? "-"}</td>
+                <td data-label="Target" className={`py-2 pr-4 max-md:break-all ${cell}`}>{i.target ?? "-"}</td>
+                <td data-label="IP" className={`py-2 pr-4 ${cell}`}>{i.ip ?? "-"}</td>
+                <td data-label="Details" className={`py-2 font-mono text-xs text-zinc-600 max-md:break-all max-md:empty:hidden dark:text-zinc-400 ${cell}`}>{i.detail ?? ""}</td>
               </tr>
             ))}
           </tbody>

@@ -50,7 +50,7 @@ export function ThemeToggle() {
       onClick={cycle}
       title="Switch colour theme"
       aria-label={`Colour theme: ${LABEL[current]}. Click to change.`}
-      className="rounded-md border border-zinc-300 px-2 py-1 text-sm text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+      className="rounded-md border border-zinc-300 px-2 py-2 text-sm sm:py-1 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
     >
       <span aria-hidden="true">{ICON[current]}</span> {LABEL[current]}
     </button>
