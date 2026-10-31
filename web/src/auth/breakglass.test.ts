@@ -82,7 +82,7 @@ describe("resetMfaByCli", () => {
     expect(hasRole(rolesOf(db, admin.id), "admin")).toBe(true);
 
     const r = resetMfaByCli(db, { email: "admin@example.com", reason: REASON }, T0 + STEP);
-    expect(r).toEqual({ ok: true, changed: true, email: "admin@example.com", disabled: false, mustSetUpAgain: true });
+    expect(r).toEqual({ ok: true, changed: true, email: "admin@example.com", disabled: false, mustSetUpAgain: false });
     expect(db.prepare("SELECT mfa_enabled_at, mfa_secret_enc, mfa_last_step FROM users WHERE id = ?").get(admin.id)).toEqual({ mfa_enabled_at: null, mfa_secret_enc: null, mfa_last_step: 0 });
     expect(db.prepare("SELECT COUNT(*) AS n FROM recovery_codes WHERE user_id = ?").get(admin.id)).toEqual({ n: 0 });
     expect(validateSession(db, admin.token, T0 + STEP)).toBeNull();
@@ -250,6 +250,7 @@ describe("resetPasswordByCli", () => {
 describe("the recovery path for a locked-out sole admin", () => {
   it("reset-mfa then reset-password lets them log in, change the password and set MFA up again", async () => {
     const admin = await realUser("admin@example.com", ["admin"]);
+    db.prepare("UPDATE users SET mfa_required = 1 WHERE id = ?").run(admin.id);
     resetMfaByCli(db, { email: "admin@example.com", reason: REASON }, T0 + STEP);
     const pw = await resetPasswordByCli(db, { email: "admin@example.com", reason: REASON }, T0 + STEP);
     if (!pw.ok) throw new Error(pw.error);

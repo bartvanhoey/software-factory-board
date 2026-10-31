@@ -11,7 +11,7 @@ import { hashPassword } from "./password";
 import { acctThrottleKey } from "./service";
 import { revokeSessions } from "./sessions";
 import { resetFailures } from "./throttle";
-import { findUserByEmail, normalizeEmail, rolesOf, type UserRow } from "./users";
+import { findUserByEmail, normalizeEmail, type UserRow } from "./users";
 
 export type Outcome<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -59,8 +59,7 @@ export function resetMfaByCli(db: DatabaseSync, input: { email: string; reason: 
 
   return transaction(db, (): Outcome<ResetMfaResult> => {
     const user = findUserByEmail(db, found.user.email)!; // re-read inside the lock
-    const roles = rolesOf(db, user.id);
-    const base = { email: user.email, disabled: user.disabled_at !== null, mustSetUpAgain: user.mfa_required === 1 || roles.includes("admin") };
+    const base = { email: user.email, disabled: user.disabled_at !== null, mustSetUpAgain: user.mfa_required === 1 };
     // Any trace counts, not only a finished enrolment: a half-finished one (a pending secret on a stolen session)
     // is exactly what an operator mid-incident wants gone, together with the sessions.
     const hasTrace =

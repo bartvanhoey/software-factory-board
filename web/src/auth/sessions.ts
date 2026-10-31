@@ -27,7 +27,7 @@ export interface SessionInfo {
   /** Password accepted, second factor not yet. */
   mfaPending: boolean;
   mfaEnabled: boolean;
-  /** Admins always, anyone else when an admin turned it on for them. Read live, so it applies at once. */
+  /** Only when an admin turned it on for this user (admins included). Read live, so it applies at once. */
   mfaRequired: boolean;
   /** Required but not set up yet. */
   needsMfaSetup: boolean;
@@ -93,7 +93,7 @@ export function validateSession(db: DatabaseSync, token: string, now = Date.now(
     db.prepare("UPDATE sessions SET last_seen_at = ? WHERE id_hash = ?").run(now, tokenHash);
   }
   const mfaEnabled = row.mfa_enabled_at !== null;
-  const mfaRequired = row.mfa_required === 1 || hasRole(roles, "admin");
+  const mfaRequired = row.mfa_required === 1;
   return {
     tokenHash,
     userId: row.user_id,

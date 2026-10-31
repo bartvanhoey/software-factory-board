@@ -206,7 +206,7 @@ export interface UserListItem {
   createdAt: number;
   emailVerified: boolean;
   mfaEnabled: boolean;
-  /** The per-user flag. Admins are always required to use MFA, whatever this says. */
+  /** The per-user flag. Off by default for everyone, admins included. */
   mfaRequired: boolean;
 }
 

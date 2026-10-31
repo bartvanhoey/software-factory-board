@@ -169,7 +169,7 @@ describe("reset-mfa", () => {
     const db = openDb(dbPath);
     const id = createUser(db, { email: "admin@example.com", passwordHash: "x" });
     grantRole(db, id, "admin", null);
-    db.prepare("UPDATE users SET mfa_enabled_at = 1, mfa_secret_enc = 'v1.x.y.z' WHERE id = ?").run(id);
+    db.prepare("UPDATE users SET mfa_required = 1, mfa_enabled_at = 1, mfa_secret_enc = 'v1.x.y.z' WHERE id = ?").run(id);
     db.prepare("INSERT INTO recovery_codes (user_id, code_hash) VALUES (?, 'h')").run(id);
     db.close();
   }
