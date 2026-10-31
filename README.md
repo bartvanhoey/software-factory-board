@@ -36,6 +36,16 @@ A person always does the final merge. The web application sits behind a login, s
 
    # Plain http on localhost
    COOKIE_SECURE=false
+   
+   # Scheduler: runs the lanes (review, qa, build) automatically for every project that is switched on in the web app.
+   # Off by default. Once on, it builds issues labelled "ready" with your tokens, so turn it on on purpose.
+   # It never merges a pull request.
+   SCHEDULER_ENABLED=true
+   # Minutes to wait after a pass ends before the next one starts (1 to 1440).
+   SCHEDULER_INTERVAL_MINUTES=5
+   # A single run is stopped after this many minutes (1 to 170).
+   SCHEDULER_RUN_TIMEOUT_MINUTES=120
+
    ```
 
    **Claude Code token:** install [Claude Code](https://claude.com/claude-code), run `claude setup-token` and follow the login. It prints a long-lived token (it needs a Claude subscription).
@@ -61,7 +71,7 @@ A person always does the final merge. The web application sits behind a login, s
 
 4. Add your GitHub repositories on the **Projects** screen and switch them on.
 
-Nothing builds by itself until you set `SCHEDULER_ENABLED=true`.
+The scheduler is switched on in the example above, so the factory builds `ready` issues of every switched-on project by itself. To stop that, set `SCHEDULER_ENABLED=false` in `.env` and run `docker compose up -d`.
 
 ## Learn more
 
