@@ -2,7 +2,8 @@
 
 The projects are managed in the web app (**Admin > Projects**). This folder is only a seed: when the web app starts and its
 project table is empty, it imports every valid `projects/<name>.json` once. After that the files are ignored, so editing one
-changes nothing. A file that does not validate is skipped, and the web app's log names it.
+changes nothing. A file that does not validate is skipped, and the web app's log names it. Imported projects always start
+switched off; an Administrator switches them on in the web app.
 
 One JSON file per target repo. The filename must equal `name`: `projects/<name>.json`.
 Run `npm run validate` to check the files before the first start.
@@ -12,7 +13,7 @@ Run `npm run validate` to check the files before the first start.
 | `name` | yes | | lowercase slug, must match the filename |
 | `repo` | yes | | `owner/name` on GitHub |
 | `defaultBranch` | no | `main` | |
-| `enabled` | no | `true` | `false` pauses all lanes |
+| `enabled` | no | `true` | not used by the import: imported projects start switched off |
 | `stack` | no | `other` | `dotnet`, `node`, `python`, `other` |
 | `commands.build` | no | | run when no `test` command exists |
 | `commands.test` | no | | omit for projects without tests |

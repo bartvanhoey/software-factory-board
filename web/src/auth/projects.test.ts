@@ -309,14 +309,21 @@ describe("importProjects", () => {
     file("alpha.json", { name: "alpha", repo: "o/alpha", limits: { maxTurns: 30 }, commands: { test: "npm test" } });
     file("beta.json", { name: "beta", repo: "o/beta", enabled: false });
     expect(importProjects(db, dir, quiet, T0)).toEqual({ imported: ["alpha", "beta"], skipped: [] });
-    expect(getProject(db, "alpha")).toMatchObject({ enabled: true, limits: { maxTurns: 30 } });
-    expect(getProject(db, "beta")!.enabled).toBe(false);
+    expect(getProject(db, "alpha")).toMatchObject({ limits: { maxTurns: 30 } });
     expect(actions()).toEqual(["project.imported", "project.imported"]);
 
     // a second start finds rows and changes nothing, even though the file now differs
     file("alpha.json", { name: "alpha", repo: "o/alpha", limits: { maxTurns: 99 } });
     expect(importProjects(db, dir, quiet, T0).imported).toEqual([]);
     expect(getProject(db, "alpha")!.limits.maxTurns).toBe(30);
+  });
+
+  it("switches every imported project off, whatever its file says, and records it", () => {
+    file("alpha.json", { name: "alpha", repo: "o/alpha", enabled: true });
+    file("beta.json", { name: "beta", repo: "o/beta" });
+    importProjects(db, dir, quiet, T0);
+    expect(listProjects(db).map((p) => p.enabled)).toEqual([false, false]);
+    expect(lastDetail()).toMatchObject({ name: "beta", enabled: false });
   });
 
   it("skips a file that does not validate, names it, and still imports the rest", () => {
