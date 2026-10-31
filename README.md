@@ -39,8 +39,8 @@ Fill in `.env`:
 | Variable | Set it to |
 | --- | --- |
 | `CLAUDE_CODE_OAUTH_TOKEN` | Your Claude Code token (runner only) |
-| `GH_TOKEN` | A token that can write issues, pull requests and contents (runner only) |
-| `WEB_GH_TOKEN` | A separate read-only token for the board. Leave it empty to see demo data |
+| `RUNNER_GITHUB_TOKEN` | A token that can write issues, pull requests and contents (runner only) |
+| `BOARD_GITHUB_TOKEN` | A separate read-only token for the board. Leave it empty to see demo data |
 | `MFA_ENCRYPTION_KEY` | 32 random bytes, base64. The web container refuses to start without it |
 | `RUNNER_API_TOKEN` | 32 or more random bytes, base64. The runner uses it to fetch the projects from the web app. The web container refuses to start without it |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | The first administrator (12 to 128 characters) |
@@ -147,8 +147,8 @@ Access to the server is the authorisation: anyone who can run `docker exec` can 
 | `MFA_ENCRYPTION_KEY` | yes | | Encrypts MFA secrets. Must be random bytes |
 | `RUNNER_API_TOKEN` | yes | | Lets the runner fetch the projects from the web app (at least 32 random bytes, base64) |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | first start | | Creates the first administrator when none exists |
-| `WEB_GH_TOKEN` | no | | Read-only token for the board. Empty means demo data |
-| `GH_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN` | for the runner | | Runner credentials, never given to the web container |
+| `BOARD_GITHUB_TOKEN` | no | | Read-only token for the board. Empty means demo data |
+| `RUNNER_GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN` | for the runner | | Runner credentials, never given to the web container |
 | `COOKIE_SECURE` | no | on in production | `false` for plain http on localhost |
 | `TRUST_PROXY` | no | `false` | Believe `X-Forwarded-For` from a proxy you control |
 | `EMAIL_VERIFICATION` | no | `false` | Email verification and reset by email |

@@ -46,7 +46,7 @@ check "capability set is empty"      pass sh -c 'grep -q "^CapEff:[[:space:]]*00
 check "no-new-privileges is set"     pass sh -c 'grep -q "^NoNewPrivs:[[:space:]]*1$" /proc/self/status'
 
 echo "== secrets"
-docker run --rm --entrypoint sh software-factory-runner:dev -c 'env | grep -E "^(GH_TOKEN|ANTHROPIC_API_KEY)=." ' >/dev/null 2>&1 \
+docker run --rm --entrypoint sh software-factory-runner:dev -c 'env | grep -E "^(GH_TOKEN|RUNNER_GITHUB_TOKEN|ANTHROPIC_API_KEY)=." ' >/dev/null 2>&1 \
   && { echo "FAIL  image contains a secret in its env"; FAIL=1; } || echo "ok    image env has no secrets"
 
 echo "== web service (needs: docker compose up -d web)"
@@ -64,13 +64,13 @@ if docker compose ps --status running --services 2>/dev/null | grep -qx web; the
   wcheck "web can write its cache tmpfs"    pass sh -c 'touch /app/web/.next/cache/.probe && rm /app/web/.next/cache/.probe'
   wcheck "web capability set is empty"      pass sh -c 'grep -q "^CapEff:[[:space:]]*0000000000000000$" /proc/self/status'
   wcheck "web has no ANTHROPIC_API_KEY"     fail sh -c 'test -n "$ANTHROPIC_API_KEY"'
-  runner_token="$(sed -n 's/^GH_TOKEN=//p' .env | tr -d '\r')"
+  runner_token="$(sed -n 's/^RUNNER_GITHUB_TOKEN=//p' .env | tr -d '\r')"
   if [ -z "$runner_token" ]; then
-    echo "skip  runner GH_TOKEN is empty in .env, cannot compare with the web token"
-  elif [ "$(wexec printenv GH_TOKEN 2>/dev/null | tr -d '\r')" = "$runner_token" ]; then
-    echo "FAIL  web container holds the runner's GH_TOKEN"; FAIL=1
+    echo "skip  runner RUNNER_GITHUB_TOKEN is empty in .env, cannot compare with the web token"
+  elif [ "$(wexec printenv BOARD_GITHUB_TOKEN 2>/dev/null | tr -d '\r')" = "$runner_token" ]; then
+    echo "FAIL  web container holds the runner's RUNNER_GITHUB_TOKEN"; FAIL=1
   else
-    echo "ok    web container does not hold the runner's GH_TOKEN"
+    echo "ok    web container does not hold the runner's RUNNER_GITHUB_TOKEN"
   fi
 else
   echo "skip  web service is not running"
