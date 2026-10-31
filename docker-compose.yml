@@ -26,6 +26,11 @@ services:
     # A stop forwards SIGTERM to the run in progress; this is how long it gets before docker kills the container.
     stop_grace_period: 60s
 
+    # The runner fetches the projects from web on every pass, so it waits until web is healthy instead of failing its first pass.
+    depends_on:
+      web:
+        condition: service_healthy
+
     # Secrets come from .env (gitignored), never from the image.
     env_file: .env
     environment:

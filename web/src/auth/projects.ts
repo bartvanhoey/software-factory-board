@@ -261,7 +261,8 @@ export interface ImportResult {
 
 /**
  * Brings projects/*.json into an empty table, once. When the table already has rows it does nothing, so a later start
- * can never undo an edit. A file that does not validate is skipped and named; the others still go in.
+ * can never undo an edit. A file that does not validate is skipped and named; the others still go in. Every project
+ * comes in switched off, whatever its file says: switching one on is the Administrator's decision.
  */
 export function importProjects(db: DatabaseSync, dir: string, log: (message: string) => void = console.log, now: number = Date.now()): ImportResult {
   const result: ImportResult = { imported: [], skipped: [] };
@@ -274,7 +275,8 @@ export function importProjects(db: DatabaseSync, dir: string, log: (message: str
     for (const file of files) {
       try {
         const project = parseProject(JSON.parse(readFileSync(join(dir, file), "utf8")), join(dir, file));
-        insert.run(project.name, project.repo, configOf(project), project.enabled ? 1 : 0, now, now);
+        project.enabled = false;
+        insert.run(project.name, project.repo, configOf(project), 0, now, now);
         audit(db, { action: "project.imported", detail: { name: project.name, ...detailOf(project), file } }, now);
         result.imported.push(project.name);
       } catch (err) {
