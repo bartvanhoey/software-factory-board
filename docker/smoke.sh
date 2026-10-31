@@ -57,8 +57,12 @@ wcheck() { # wcheck <description> <expected: pass|fail> <command...>
   if [ "$got" = "$want" ]; then printf 'ok    %s\n' "$desc"; else printf 'FAIL  %s (wanted %s, got %s)\n' "$desc" "$want" "$got"; FAIL=1; fi
 }
 if docker compose ps --status running --services 2>/dev/null | grep -qx web; then
-  code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:2999/ || true)"
-  if [ "$code" = 200 ]; then echo "ok    dashboard answers on 127.0.0.1:2999"; else echo "FAIL  dashboard on 127.0.0.1:2999 (http $code)"; FAIL=1; fi
+  # The dashboard is behind the login, so an anonymous request is redirected to /login.
+  reply="$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' http://127.0.0.1:2999/ || true)"
+  case "$reply" in
+    "307 "*/login) echo "ok    dashboard redirects to /login on 127.0.0.1:2999" ;;
+    *) echo "FAIL  dashboard on 127.0.0.1:2999 (wanted a 307 to /login, got: $reply)"; FAIL=1 ;;
+  esac
   wcheck "web runs as non-root"             pass sh -c '[ "$(id -u)" = 10001 ]'
   wcheck "web code is read-only"            fail sh -c 'touch /app/web/probe'
   wcheck "web can write its cache tmpfs"    pass sh -c 'touch /app/web/.next/cache/.probe && rm /app/web/.next/cache/.probe'
