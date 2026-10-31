@@ -7,7 +7,7 @@ import { waitMessage } from "./service";
 import { markMfaVerified, revokeSessions } from "./sessions";
 import { recordFailure, releaseFailure, resetFailures, retryAfter } from "./throttle";
 import { base32, generateSecret, otpauthUri, verifyTotp } from "./totp";
-import { findUserById } from "./users";
+import { findUserById, rolesOf } from "./users";
 
 export interface MfaCtx {
   ip: string | null;
@@ -213,6 +213,26 @@ export function regenerateRecoveryCodes(db: DatabaseSync, key: Buffer, userId: s
     return codes;
   });
   return { ok: true, recoveryCodes };
+}
+
+/**
+ * An administrator takes their own authenticator off after proving a current code, so a stolen session cannot do it.
+ * Not while MFA is required for them (they would be sent straight back to setup): stop requiring it first. Other
+ * sessions end; this one stays.
+ */
+export function disableOwnMfa(db: DatabaseSync, key: Buffer, session: { tokenHash: string; userId: string }, input: string, ctx: MfaCtx): MfaResult {
+  const user = findUserById(db, session.userId);
+  if (!user || !rolesOf(db, user.id).includes("admin")) return { ok: false, error: "Only an administrator can turn their own MFA off. Ask an administrator." };
+  if (user.mfa_required === 1) return { ok: false, error: "MFA is required for your account. Stop requiring it on the Users screen first." };
+  const proof = proveFactor(db, key, session.userId, input, ctx);
+  if (!proof.ok) return proof;
+  const now = ctx.now ?? Date.now();
+  transaction(db, () => {
+    clearMfa(db, session.userId);
+    revokeSessions(db, session.userId, session.tokenHash);
+    audit(db, { action: "mfa.disabled", actor: session.userId, target: session.userId, ip: ctx.ip }, now);
+  });
+  return { ok: true };
 }
 
 /** Removes everything MFA for a user. Callers decide who may do this and end the sessions. */

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { getAuthConfig } from "./config";
 import { requestContext, requirePendingMfa, requireState } from "./dal";
 import { getDb } from "./db";
-import { completeLogin, confirmSetup, regenerateRecoveryCodes, startReenrolment, type MfaCtx } from "./mfa";
+import { completeLogin, confirmSetup, disableOwnMfa, regenerateRecoveryCodes, startReenrolment, type MfaCtx } from "./mfa";
 
 export interface MfaState {
   error?: string;
@@ -66,6 +66,19 @@ export async function startReenrolmentAction(_prev: MfaState, form: FormData): P
   }
   if (!result.ok) return { error: result.error };
   redirect("/account/mfa/setup");
+}
+
+/** An administrator turning their own MFA off. Needs a current code, so a stolen session cannot do it. */
+export async function disableOwnMfaAction(_prev: MfaState, form: FormData): Promise<MfaState> {
+  const session = await requireState("/account/mfa");
+  let result: ReturnType<typeof disableOwnMfa>;
+  try {
+    result = disableOwnMfa(getDb(), getAuthConfig().mfaKey, session, field(form, "code"), await context());
+  } catch (err) {
+    return failed(err);
+  }
+  if (!result.ok) return { error: result.error };
+  redirect("/account/mfa");
 }
 
 export async function regenerateRecoveryCodesAction(_prev: MfaState, form: FormData): Promise<MfaState> {

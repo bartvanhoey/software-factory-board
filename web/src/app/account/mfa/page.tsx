@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireState } from "@/auth/dal";
 import { getDb } from "@/auth/db";
 import { recoveryCodesLeft } from "@/auth/mfa";
-import { regenerateRecoveryCodesAction, startReenrolmentAction } from "@/auth/mfa-actions";
+import { disableOwnMfaAction, regenerateRecoveryCodesAction, startReenrolmentAction } from "@/auth/mfa-actions";
 import { AuthCard } from "@/components/auth/AuthCard";
 import { CodeForm } from "@/components/auth/CodeForm";
 
@@ -12,6 +12,7 @@ export const metadata = { title: "MFA · Software Factory Board" };
 export default async function MfaPage() {
   const session = await requireState("/account/mfa");
   const left = session.mfaEnabled ? recoveryCodesLeft(getDb(), session.userId) : 0;
+  const isAdmin = session.roles.includes("admin");
 
   return (
     <AuthCard title="Multi-factor authentication">
@@ -27,7 +28,12 @@ export default async function MfaPage() {
       ) : (
         <div className="space-y-8">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            MFA is <strong>on</strong>{session.mfaRequired ? " and required for your account" : ""}. Only an administrator can turn it off{session.mfaRequired ? ", and not while it is required" : ""}.
+            MFA is <strong>on</strong>{session.mfaRequired ? " and required for your account" : ""}.{" "}
+            {isAdmin
+              ? session.mfaRequired
+                ? "To turn it off, stop requiring it on the Users screen first."
+                : "You can turn it off below."
+              : `Only an administrator can turn it off${session.mfaRequired ? ", and not while it is required" : ""}.`}
           </p>
           <section aria-labelledby="codes">
             <h2 id="codes" className="mb-1 font-semibold">
@@ -51,6 +57,15 @@ export default async function MfaPage() {
             <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">Moving to a new phone? Prove a current code, then scan a new key. Your other sessions will end.</p>
             <CodeForm action={startReenrolmentAction} label="Current code" submit="Continue" hint="A code from your app, or a recovery code." />
           </section>
+          {isAdmin && !session.mfaRequired && (
+            <section aria-labelledby="turn-off">
+              <h2 id="turn-off" className="mb-1 font-semibold">
+                Turn off MFA
+              </h2>
+              <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">Prove a current code to remove your authenticator and recovery codes. Your other sessions will end.</p>
+              <CodeForm action={disableOwnMfaAction} label="Current code" submit="Turn off MFA" hint="A code from your app, or a recovery code." />
+            </section>
+          )}
         </div>
       )}
       <p className="mt-8 text-sm">

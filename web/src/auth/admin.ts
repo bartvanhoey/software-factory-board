@@ -133,14 +133,27 @@ export function markEmailVerified(db: DatabaseSync, actorId: string, targetId: s
   });
 }
 
-/** The per-user "must use MFA" flag. It applies on the user's next request, because the gate reads it live. */
+/**
+ * The per-user "must use MFA" flag. It applies on the user's next request, because the gate reads it live.
+ * Stopping it for a non-admin also removes their authenticator and ends their sessions. An administrator's
+ * authenticator stays (their own comes off at /account/mfa with a current code, anyone else's from the server).
+ */
 export function setMfaRequired(db: DatabaseSync, actorId: string, targetId: string, required: boolean, ctx: AdminCtx): Done {
   return asAdmin(db, actorId, "mfa.require", targetId, ctx, (now) => {
     const target = findUserById(db, targetId);
     if (!target) return { ok: false, error: NOT_FOUND };
-    if ((target.mfa_required === 1) === required) return { ok: true };
-    db.prepare("UPDATE users SET mfa_required = ? WHERE id = ?").run(required ? 1 : 0, targetId);
-    audit(db, { action: required ? "mfa.required_set" : "mfa.required_cleared", actor: actorId, target: targetId, ip: ctx.ip }, now);
+    const flagChanged = (target.mfa_required === 1) !== required;
+    const removesMfa = !required && target.mfa_enabled_at !== null && !rolesOf(db, targetId).includes("admin");
+    if (!flagChanged && !removesMfa) return { ok: true };
+    if (flagChanged) {
+      db.prepare("UPDATE users SET mfa_required = ? WHERE id = ?").run(required ? 1 : 0, targetId);
+      audit(db, { action: required ? "mfa.required_set" : "mfa.required_cleared", actor: actorId, target: targetId, ip: ctx.ip }, now);
+    }
+    if (removesMfa) {
+      clearMfa(db, targetId);
+      revokeSessions(db, targetId);
+      audit(db, { action: "mfa.reset_by_admin", actor: actorId, target: targetId, ip: ctx.ip }, now);
+    }
     return { ok: true };
   });
 }
