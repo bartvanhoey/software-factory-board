@@ -28,7 +28,7 @@ const CHECKS: Record<ChecksState, { label: string; className: string } | null> =
 function Card({ issue, now }: { issue: BoardIssue; now: Date }) {
   const checks = issue.pr ? CHECKS[issue.pr.checks] : null;
   return (
-    <article className="rounded-lg border border-zinc-200 bg-white p-3 text-sm shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+    <article className={`rounded-lg border p-3 text-sm shadow-sm ${projectColor(issue.project).card}`}>
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <span className={`truncate rounded px-1.5 py-0.5 text-xs font-medium ${projectColor(issue.project).badge}`}>
           {issue.project}
