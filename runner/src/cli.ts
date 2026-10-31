@@ -94,7 +94,7 @@ async function requireTools(tools: string[]): Promise<void> {
   const missing = missingTools(tools);
   if (missing.length > 0) throw new UsageError(`missing tool: ${missing.join(", ")}`, EXIT.missingTool);
   const auth = await runProcess("gh", ["auth", "status"], { env: { GH_PROMPT_DISABLED: "1" } });
-  if (auth.code !== 0) throw new UsageError("gh is not logged in (set RUNNER_GITHUB_TOKEN)", EXIT.missingTool);
+  if (auth.code !== 0) throw new UsageError("gh is not logged in (set GH_TOKEN; under docker compose it comes from RUNNER_GITHUB_TOKEN in .env)", EXIT.missingTool);
 }
 
 function findProject(projects: Project[], name: string): Project {

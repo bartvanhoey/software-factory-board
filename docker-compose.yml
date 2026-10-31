@@ -36,7 +36,9 @@ services:
       # The projects live in the web service (ADR 0001); RUNNER_API_TOKEN comes from .env above.
       FACTORY_WEB_URL: http://web:2999
       # The gh CLI only reads GH_TOKEN, so the runner's token is handed to it under that name.
-      GH_TOKEN: ${RUNNER_GITHUB_TOKEN:-}
+      # An older .env that still has GH_TOKEN keeps working; without the fallback an unset RUNNER_GITHUB_TOKEN would
+      # override it with an empty string.
+      GH_TOKEN: ${RUNNER_GITHUB_TOKEN:-${GH_TOKEN:-}}
 
     mem_limit: 4g
     cpus: 2.0
