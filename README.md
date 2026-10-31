@@ -1,6 +1,10 @@
-# Software Factory Board
+# Software Factory
 
-A self-hosted board that turns GitHub issues into pull requests, with Claude Code doing the work.
+A software factory that runs in a Docker container and turns GitHub issues into pull requests, with Claude Code doing the work. It comes with a web application for:
+
+- **Issue Board:** every issue in its lane, from `ready` to `done`.
+- **Users:** who may log in, and with which role.
+- **Projects:** the GitHub repositories the factory works on.
 
 You label an issue `ready`. The factory then:
 
@@ -8,33 +12,56 @@ You label an issue `ready`. The factory then:
 2. **Tests** it.
 3. **Reviews** it, and opens a pull request only if the review approves.
 
-The board shows every issue in its lane, from `ready` to `done`. A person always does the final merge. The board sits behind a login, so only people you approve can see it.
+A person always does the final merge. The web application sits behind a login, so only people you approve can see it.
 
 ## Getting Started
 
 You need Docker with Compose v2. For real work you also need a GitHub token and a Claude Code token; to just look around you need neither.
 
-1. Copy the settings file:
+1. Create a file named `.env` in the project root with the variables below. This is the minimum; `.env.example` lists the optional ones.
 
    ```bash
-   cp .env.example .env
+   # Random secrets, one value each: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+   MFA_ENCRYPTION_KEY=<random base64 value>
+   RUNNER_API_TOKEN=<another random base64 value>
+
+   # Your first administrator (password: 12 to 128 characters)
+   ADMIN_EMAIL=you@example.com
+   ADMIN_PASSWORD=<a strong password>
+
+   # Needed only for the factory to build; leave empty to just look around
+   CLAUDE_CODE_OAUTH_TOKEN=<your Claude Code token>
+
+   # GitHub tokens: two separate ones, never reuse one for the other
+   RUNNER_GITHUB_TOKEN=<token the factory builds with: writes branches, issues and pull requests>
+   BOARD_GITHUB_TOKEN=<read-only token for the board; leave empty to see demo data>
+
+   # Plain http on localhost
+   COOKIE_SECURE=false
    ```
 
-2. Open `.env` and set at least:
-   - `MFA_ENCRYPTION_KEY` and `RUNNER_API_TOKEN`: random values, made with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`
-   - `ADMIN_EMAIL` and `ADMIN_PASSWORD`: your first administrator (12 to 128 characters)
+   **Claude Code token:** install [Claude Code](https://claude.com/claude-code), run `claude setup-token` and follow the login. It prints a long-lived token (it needs a Claude subscription).
 
-   Leave `BOARD_GITHUB_TOKEN` empty to see demo data. Add `RUNNER_GITHUB_TOKEN` and `CLAUDE_CODE_OAUTH_TOKEN` when you want the factory to actually build.
+   **GitHub tokens:** create two separate fine-grained tokens at <https://github.com/settings/personal-access-tokens/new>. For each one, under *Repository access* choose *Only select repositories* and pick the repositories the factory will work on. Then under *Repository permissions* set exactly this and leave everything else on *No access*:
 
-3. Start it:
+   | Repository permission | `RUNNER_GITHUB_TOKEN` | `BOARD_GITHUB_TOKEN` |
+   | --- | --- | --- |
+   | Issues | **Read and write** | Read-only |
+   | Pull requests | **Read and write** | Read-only |
+   | Contents | **Read and write** | Read-only |
+   | Commit statuses | No access | Read-only |
+
+   The board token must never be able to write: it only displays what is on GitHub.
+
+2. Start it:
 
    ```bash
    docker compose up -d --build
    ```
 
-4. Open <http://localhost:2999> and log in with the administrator you set. You will be asked to choose a new password.
+3. Open <http://localhost:2999> and log in with the administrator you set. You will be asked to choose a new password.
 
-5. Add your GitHub repositories on the **Projects** screen and switch them on.
+4. Add your GitHub repositories on the **Projects** screen and switch them on.
 
 Nothing builds by itself until you set `SCHEDULER_ENABLED=true`.
 
