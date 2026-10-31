@@ -56,8 +56,8 @@ user's sessions. Admins cannot remove their own admin role, disable themselves o
 least one active admin must always remain. `/admin/audit` is a read-only, filterable log of who did what. Users are
 disabled, never deleted. Role changes take effect on the next request; they do not end sessions.
 
-Multi-factor authentication (TOTP, any authenticator app): admins must use it, and an admin can require it for any other
-user. Turning it on shows a QR code and ten one-time recovery codes (shown once). After the password, a user with MFA
+Multi-factor authentication (TOTP, any authenticator app): it is off by default, admins included. An admin can require it for any
+user, other admins and themselves too, and users can turn it on for themselves. Turning it on shows a QR code and ten one-time recovery codes (shown once). After the password, a user with MFA
 has five minutes to enter a code; until then the session grants nothing. A code can be used only once, and wrong
 guesses are delayed like password guesses. Users can get new recovery codes or replace their authenticator at
 `/account/mfa` (both need a current code). Only an admin can turn MFA off for a non-admin (Reset MFA on the users
@@ -121,11 +121,11 @@ docker compose exec web npm run admin -- reset-password --email <email> --reason
 ```
 
 - `reset-mfa` removes the user's authenticator, any half-finished setup and recovery codes, and ends all their
-  sessions. It works on admins. An admin (or anyone MFA is required for) sets MFA up again at their next login, after
-  the password. For an account with no MFA at all it changes nothing, not even the sessions (`reset-password` ends those).
+  sessions. It works on admins. Anyone MFA is required for (admins included, when an admin turned that on) sets MFA up
+  again at their next login, after the password. For an account with no MFA at all it changes nothing, not even the sessions (`reset-password` ends those).
 - `reset-password` sets a temporary password, printed once on your terminal, that must be changed at next login, and
   ends all their sessions. It does not touch MFA, so a lost password alone never removes a second factor.
-- Lost both? Run both, hand the temporary password over privately, and they log in, change it and set MFA up again.
+- Lost both? Run both, hand the temporary password over privately, and they log in, change it and, if MFA is required for them, set it up again.
 - **If an admin's password may be compromised, run `reset-password` first, or both.** After `reset-mfa` alone an admin can
   log in with just the old password until MFA is set up again, and whoever logs in first sets up their own authenticator.
 - `--reason` is required: one line, up to 200 characters, with some real text in it and no control or invisible
