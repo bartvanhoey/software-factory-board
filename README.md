@@ -1,12 +1,13 @@
 # Software Factory
 
-A software factory that runs in a Docker container and turns GitHub issues into pull requests, with Claude Code doing the work. It comes with a web application for:
+A software factory that runs in a Docker container and uses Claude Code to turn GitHub issues into pull requests.
+The factory comes with a web application that shows:
 
 - **Issue Board:** every issue in its lane, from `ready` to `done`.
 - **Users:** who may log in, and with which role.
 - **Projects:** the GitHub repositories the factory works on.
 
-You label an issue `ready`. The factory then:
+Create an issue and label it `ready`. The software factory then:
 
 1. **Builds** it with Claude Code on its own branch.
 2. **Tests** it.
