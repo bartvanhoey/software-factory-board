@@ -60,8 +60,9 @@ Multi-factor authentication (TOTP, any authenticator app): it is off by default,
 user, other admins and themselves too, and users can turn it on for themselves. Turning it on shows a QR code and ten one-time recovery codes (shown once). After the password, a user with MFA
 has five minutes to enter a code; until then the session grants nothing. A code can be used only once, and wrong
 guesses are delayed like password guesses. Users can get new recovery codes or replace their authenticator at
-`/account/mfa` (both need a current code). Only an admin can turn MFA off for a non-admin (Reset MFA on the users
-screen); an admin's own MFA can only be reset from the server (see "Break-glass recovery" below).
+`/account/mfa` (both need a current code). Only an admin can turn MFA off for a non-admin ("Stop requiring MFA" or Reset MFA on the users
+screen). An admin turns their own off at `/account/mfa` with a current code, once MFA is no longer required for them;
+another admin's MFA can only be reset from the server (see "Break-glass recovery" below).
 An admin who has MFA cannot be demoted from the app (that would make their MFA resettable by a stolen admin session):
 disable the account instead, or reset their MFA from the server first. MFA secrets and recovery-code hashes are derived from `MFA_ENCRYPTION_KEY`: lose that key,
 or change it, and every user must set MFA up again (there is no key rotation yet). The key must be random bytes.

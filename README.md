@@ -110,7 +110,7 @@ MFA uses any authenticator app (6-digit codes, 30 seconds). It is off by default
 - Turning it on shows a QR code and **ten one-time recovery codes**, shown once.
 - After the password, a user with MFA has five minutes to enter a code. Until then the session grants nothing, and a code works only once.
 - Users can get new recovery codes or replace their authenticator, both after proving a current code.
-- An administrator can reset MFA for a non-admin on the Users screen. An administrator's own MFA can only be reset from the server (see below).
+- "Stop requiring MFA" on the Users screen also removes a non-admin's authenticator, as does Reset MFA. An administrator turns their own MFA off at `/account/mfa` after entering a current code (once MFA is no longer required for them). Another administrator's MFA can only be reset from the server (see below).
 
 ## Email verification and password reset
 

@@ -1,11 +1,11 @@
 import { randomBytes } from "node:crypto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { openDb } from "./db";
-import { clearMfa, completeLogin, confirmSetup, pendingSetup, proveFactor, recoveryCodesLeft, regenerateRecoveryCodes, SETUP_LIFETIME, startReenrolment, type MfaCtx } from "./mfa";
+import { clearMfa, completeLogin, confirmSetup, disableOwnMfa, pendingSetup, proveFactor, recoveryCodesLeft, regenerateRecoveryCodes, SETUP_LIFETIME, startReenrolment, type MfaCtx } from "./mfa";
 import { decryptSecret } from "./mfa-crypto";
 import { createSession, validateSession } from "./sessions";
 import { stepOf, totp } from "./totp";
-import { createUser } from "./users";
+import { createUser, grantRole } from "./users";
 
 const KEY = randomBytes(32);
 const T0 = 1_700_000_010_000; // a multiple of 30 s, so the steps below are exact
@@ -170,6 +170,40 @@ describe("confirmSetup", () => {
     db.prepare("UPDATE users SET mfa_last_step = ? WHERE id = ?").run(high, user);
     expect(confirmSetup(db, KEY, first.session, totp(secretOf("mfa_setup"), later), ctx(later)).ok).toBe(true); // an earlier step
     expect((db.prepare("SELECT mfa_last_step AS s FROM users WHERE id = ?").get(user) as { s: number }).s).toBe(high);
+  });
+});
+
+describe("disableOwnMfa", () => {
+  const makeAdmin = (): void => grantRole(db, user, "admin", null, T0);
+
+  it("lets an administrator remove their own MFA with a current code, keeping only this session", () => {
+    makeAdmin();
+    const first = enrol();
+    const other = sessionOf();
+    const later = T0 + 2 * STEP;
+    expect(disableOwnMfa(db, KEY, first.session, "000000", ctx(later))).toMatchObject({ ok: false });
+    expect(disableOwnMfa(db, KEY, first.session, totp(first.secret, later), ctx(later))).toEqual({ ok: true });
+    expect(db.prepare("SELECT mfa_enabled_at AS e, mfa_secret_enc AS s FROM users WHERE id = ?").get(user)).toEqual({ e: null, s: null });
+    expect(recoveryCodesLeft(db, user)).toBe(0);
+    expect(validateSession(db, first.token, later)).not.toBeNull();
+    expect(validateSession(db, other.token, later)).toBeNull();
+    expect(actions()).toContain("mfa.disabled");
+  });
+
+  it("accepts a recovery code as the proof", () => {
+    makeAdmin();
+    const first = enrol();
+    expect(disableOwnMfa(db, KEY, first.session, first.codes[0]!, ctx(T0 + STEP))).toEqual({ ok: true });
+  });
+
+  it("refuses a non-admin, and an admin while MFA is required for them, without touching anything", () => {
+    const first = enrol();
+    const later = T0 + 2 * STEP;
+    expect(disableOwnMfa(db, KEY, first.session, totp(first.secret, later), ctx(later))).toMatchObject({ ok: false, error: expect.stringContaining("administrator") });
+    makeAdmin();
+    db.prepare("UPDATE users SET mfa_required = 1 WHERE id = ?").run(user);
+    expect(disableOwnMfa(db, KEY, first.session, totp(first.secret, later), ctx(later))).toMatchObject({ ok: false, error: expect.stringContaining("required") });
+    expect(db.prepare("SELECT mfa_enabled_at AS e FROM users WHERE id = ?").get(user)).not.toEqual({ e: null });
   });
 });
 
