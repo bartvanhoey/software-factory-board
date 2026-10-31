@@ -156,7 +156,7 @@ export function ProjectForm({ mode, values, isAdmin, locked = false }: { mode: "
           ))}
         </fieldset>
 
-        <fieldset className="grid gap-3 sm:grid-cols-4">
+        <fieldset className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <legend className="mb-1 text-xs font-medium">Limits</legend>
           <Field label="Build turns" hint="1 to 100" {...field("maxTurns")}>
             {(a) => <input className={input} type="number" name="maxTurns" min={1} max={100} defaultValue={typed(state, "maxTurns", values.limits.maxTurns)} {...a} />}
