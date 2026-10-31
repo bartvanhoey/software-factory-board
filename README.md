@@ -16,8 +16,6 @@ A person always does the final merge. The web application sits behind a login, s
 
 ## Getting Started
 
-You need Docker with Compose v2. For real work you also need a GitHub token and a Claude Code token; to just look around you need neither.
-
 1. Create a file named `.env` in the project root with the variables below. This is the minimum; `.env.example` lists the optional ones.
 
    ```bash
