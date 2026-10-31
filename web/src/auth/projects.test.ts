@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AdminCtx } from "./admin";
 import { openDb } from "./db";
-import { MAX_PROJECTS, createProject, getProject, importProjects, listProjects, setProjectEnabled, updateProject } from "./projects";
+import { MAX_PROJECTS, createProject, getProject, importProjects, listProjects, setProjectArchived, setProjectEnabled, updateProject } from "./projects";
 import { createUser, grantRole, type Role } from "./users";
 
 let db: ReturnType<typeof openDb>;
@@ -96,7 +96,7 @@ describe("updateProject", () => {
   });
 
   const full = (extra: Record<string, unknown> = {}) => {
-    const { version: _v, createdAt: _c, updatedAt: _u, ...p } = getProject(db, "demo")!;
+    const { version: _v, createdAt: _c, updatedAt: _u, archivedAt: _a, ...p } = getProject(db, "demo")!;
     return { ...p, ...extra };
   };
 
@@ -228,6 +228,56 @@ describe("setProjectEnabled", () => {
 
   it("refuses a stale version", () => {
     expect(setProjectEnabled(db, admin, "demo", true, 9, ctx)).toEqual({ ok: false, error: expect.stringMatching(/Someone else/) });
+  });
+});
+
+describe("setProjectArchived", () => {
+  beforeEach(() => {
+    createProject(db, manager, base, ctx); // starts switched off
+  });
+
+  it("archives a switched-off project, hides it from the list and records it", () => {
+    expect(setProjectArchived(db, admin, "demo", true, 1, ctx).ok).toBe(true);
+    expect(listProjects(db)).toEqual([]);
+    expect(listProjects(db, true).map((p) => p.name)).toEqual(["demo"]);
+    expect(getProject(db, "demo")).toMatchObject({ version: 2, enabled: false, archivedAt: T0 });
+    expect(actions()).toContain("project.archived");
+  });
+
+  it("refuses a switched-on project", () => {
+    setProjectEnabled(db, admin, "demo", true, 1, ctx);
+    expect(setProjectArchived(db, admin, "demo", true, 2, ctx)).toEqual({ ok: false, error: expect.stringMatching(/Switch the project off/) });
+    expect(getProject(db, "demo")!.archivedAt).toBeNull();
+  });
+
+  it("refuses a Project manager, and records the attempt", () => {
+    expect(setProjectArchived(db, manager, "demo", true, 1, ctx).ok).toBe(false);
+    expect(getProject(db, "demo")!.archivedAt).toBeNull();
+    expect(actions()).toContain("admin.denied");
+  });
+
+  it("refuses a stale version and an unknown project", () => {
+    expect(setProjectArchived(db, admin, "demo", true, 9, ctx)).toEqual({ ok: false, error: expect.stringMatching(/Someone else/) });
+    expect(setProjectArchived(db, admin, "nope", true, 1, ctx)).toEqual({ ok: false, error: expect.stringMatching(/not found/) });
+  });
+
+  it("restores a project, still switched off", () => {
+    setProjectArchived(db, admin, "demo", true, 1, ctx);
+    expect(setProjectArchived(db, admin, "demo", false, 2, ctx).ok).toBe(true);
+    expect(listProjects(db).map((p) => p.name)).toEqual(["demo"]);
+    expect(getProject(db, "demo")).toMatchObject({ enabled: false, archivedAt: null });
+    expect(actions()).toContain("project.restored");
+  });
+
+  it("cannot be edited or switched on while archived", () => {
+    setProjectArchived(db, admin, "demo", true, 1, ctx);
+    expect(setProjectEnabled(db, admin, "demo", true, 2, ctx)).toEqual({ ok: false, error: expect.stringMatching(/archived/) });
+  });
+
+  it("keeps the name and repository reserved, and says where the project is", () => {
+    setProjectArchived(db, admin, "demo", true, 1, ctx);
+    expect(createProject(db, admin, base, ctx)).toEqual({ ok: false, error: expect.stringMatching(/name.*archive/) });
+    expect(createProject(db, admin, { name: "other", repo: "owner/demo" }, ctx)).toEqual({ ok: false, error: expect.stringMatching(/repository.*archive/) });
   });
 });
 

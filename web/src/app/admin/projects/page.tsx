@@ -2,7 +2,7 @@ import { requireAccess } from "@/auth/dal";
 import { getDb } from "@/auth/db";
 import { listProjects } from "@/auth/projects";
 import { hasRole } from "@/auth/users";
-import { EnableButton, NEW_PROJECT, ProjectForm } from "@/components/admin/ProjectForm";
+import { ArchiveButton, EnableButton, NEW_PROJECT, ProjectForm } from "@/components/admin/ProjectForm";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Projects · Software Factory Board" };
@@ -13,13 +13,14 @@ export default async function ProjectsPage() {
   const session = await requireAccess("issue-admin");
   const isAdmin = hasRole(session.roles, "admin");
   const projects = listProjects(getDb());
+  const archived = isAdmin ? listProjects(getDb(), true) : [];
 
   return (
     <main>
       <h1 className="mb-1 text-xl font-semibold tracking-tight">Projects</h1>
       <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
         The GitHub repositories the factory works on. {isAdmin ? "You switch a project on and set its commands." : "A project you add stays off until an Administrator switches it on."}{" "}
-        A project is switched off, never removed, so its history stays.
+        A project is switched off or archived, never removed, so its history stays.
       </p>
 
       <details className="mb-6 rounded border border-zinc-200 p-3 dark:border-zinc-800">
@@ -49,6 +50,7 @@ export default async function ProjectsPage() {
                     {p.enabled ? "on" : "off"}
                   </span>
                   <EnableButton name={p.name} enabled={p.enabled} version={p.version} isAdmin={isAdmin} />
+                  {isAdmin && !p.enabled && <ArchiveButton name={p.name} archived={false} version={p.version} />}
                 </div>
               </div>
               <details className="mt-3">
@@ -65,6 +67,23 @@ export default async function ProjectsPage() {
             </li>
           ))}
         </ul>
+      )}
+
+      {archived.length > 0 && (
+        <details className="mt-6 rounded border border-zinc-200 p-3 dark:border-zinc-800">
+          <summary className={summary}>Archived ({archived.length})</summary>
+          <ul className="mt-3 space-y-3">
+            {archived.map((p) => (
+              <li key={p.name} className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h2 className="font-medium">{p.name}</h2>
+                  <p className="text-xs text-zinc-600 dark:text-zinc-400">{p.repo}</p>
+                </div>
+                <ArchiveButton name={p.name} archived version={p.version} />
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
     </main>
   );

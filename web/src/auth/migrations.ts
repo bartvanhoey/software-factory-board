@@ -163,4 +163,13 @@ export const migrations: readonly Migration[] = [
         BEGIN SELECT RAISE(ABORT, 'projects are disabled, never deleted'); END;
     `,
   },
+  {
+    version: 7,
+    name: "project archive",
+    sql: `
+      -- An archived project is hidden from the lists and the runner, but its row stays: the name and repository remain
+      -- reserved and the history is kept. Only a switched-off project can be archived, so enabled is 0 whenever this is set.
+      ALTER TABLE projects ADD COLUMN archived_at INTEGER;
+    `,
+  },
 ];

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useId, useRef } from "react";
-import { createProjectAction, saveProjectAction, setProjectEnabledAction, type ProjectState } from "@/auth/project-actions";
+import { createProjectAction, saveProjectAction, setProjectArchivedAction, setProjectEnabledAction, type ProjectState } from "@/auth/project-actions";
 import { errorField } from "@/auth/project-fields";
 
 export interface ProjectValues {
@@ -206,6 +206,22 @@ export function ProjectForm({ mode, values, isAdmin, locked = false }: { mode: "
       ) : (
         <Feedback state={state} />
       )}
+    </form>
+  );
+}
+
+/** Archives a switched-off project, or restores an archived one. Administrator only; the page does not render it for anyone else. */
+export function ArchiveButton({ name, archived, version }: { name: string; archived: boolean; version: number }) {
+  const [state, action, pending] = useActionState(setProjectArchivedAction, {});
+  return (
+    <form action={action}>
+      <input type="hidden" name="name" value={name} />
+      <input type="hidden" name="version" value={version} />
+      <input type="hidden" name="archived" value={archived ? "false" : "true"} />
+      <button type="submit" aria-disabled={pending} onClick={(e) => pending && e.preventDefault()} className={button}>
+        {archived ? "Restore" : "Archive"}
+      </button>
+      <Feedback state={state} />
     </form>
   );
 }
