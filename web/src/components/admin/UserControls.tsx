@@ -128,29 +128,27 @@ export function UserControls({
               <Feedback state={emailState} />
             </form>
           )}
+          <form action={requireAction}>
+            <input type="hidden" name="userId" value={id} />
+            <input type="hidden" name="required" value={mfaRequired ? "false" : "true"} />
+            <button type="submit" disabled={requirePending} className={button}>
+              {mfaRequired ? "Stop requiring MFA" : "Require MFA"}
+            </button>
+            <Feedback state={requireState} />
+          </form>
           {isAdmin ? (
-            <p className="basis-full text-xs text-zinc-500 dark:text-zinc-400">MFA is always required for admins. An admin&apos;s MFA can only be reset from the server: <code className="font-mono">{BREAKGLASS_RESET_MFA}</code>
+            <p className="basis-full text-xs text-zinc-500 dark:text-zinc-400">An admin&apos;s MFA can only be reset from the server: <code className="font-mono">{BREAKGLASS_RESET_MFA}</code>
             </p>
           ) : (
-            <>
-              <form action={requireAction}>
+            mfaEnabled && (
+              <form action={resetMfaFormAction}>
                 <input type="hidden" name="userId" value={id} />
-                <input type="hidden" name="required" value={mfaRequired ? "false" : "true"} />
-                <button type="submit" disabled={requirePending} className={button}>
-                  {mfaRequired ? "Stop requiring MFA" : "Require MFA"}
+                <button type="submit" disabled={resetMfaPending} className={button}>
+                  Reset MFA
                 </button>
-                <Feedback state={requireState} />
+                <Feedback state={resetMfaState} />
               </form>
-              {mfaEnabled && (
-                <form action={resetMfaFormAction}>
-                  <input type="hidden" name="userId" value={id} />
-                  <button type="submit" disabled={resetMfaPending} className={button}>
-                    Reset MFA
-                  </button>
-                  <Feedback state={resetMfaState} />
-                </form>
-              )}
-            </>
+            )
           )}
         </div>
       )}

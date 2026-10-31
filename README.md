@@ -105,7 +105,7 @@ Administrators get an **Admin** link in the header, and Project managers a **Pro
 
 ## Multi-factor authentication
 
-MFA uses any authenticator app (6-digit codes, 30 seconds). Administrators must use it. An administrator can require it for any other user, and users can turn it on themselves at `/account/mfa`.
+MFA uses any authenticator app (6-digit codes, 30 seconds). It is off by default, administrators included. An administrator can require it for any user, themselves and other administrators too, and users can turn it on themselves at `/account/mfa`.
 
 - Turning it on shows a QR code and **ten one-time recovery codes**, shown once.
 - After the password, a user with MFA has five minutes to enter a code. Until then the session grants nothing, and a code works only once.

@@ -49,7 +49,7 @@ export default async function UsersPage() {
                 </td>
                 <td className="py-3 pr-4 text-zinc-600 dark:text-zinc-400">
                   {u.mfaEnabled ? "on" : "off"}
-                  {u.mfaRequired || u.roles.includes("admin") ? " · required" : ""}
+                  {u.mfaRequired ? " · required" : ""}
                 </td>
                 {emailVerification && <td className="py-3 pr-4 text-zinc-600 dark:text-zinc-400">{u.emailVerified ? "confirmed" : "not confirmed"}</td>}
                 <td className="py-3 pr-4 text-zinc-600 dark:text-zinc-400">{day(u.createdAt)}</td>

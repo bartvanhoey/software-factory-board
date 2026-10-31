@@ -99,13 +99,15 @@ describe("sessions", () => {
     expect(validateSession(db, full, T0 + MFA_PENDING_LIMIT + 1000)).not.toBeNull();
   });
 
-  it("says when MFA is required and not set up: always for admins, for others only when the flag is on", () => {
+  it("says when MFA is required and not set up: only when the flag is on, for admins as for everyone", () => {
     const u = validateSession(db, createSession(db, user, {}, T0).token, T0)!;
     expect(u).toMatchObject({ mfaRequired: false, mfaEnabled: false, needsMfaSetup: false });
     db.prepare("UPDATE users SET mfa_required = 1 WHERE id = ?").run(user);
     expect(validateSession(db, createSession(db, user, {}, T0).token, T0)).toMatchObject({ mfaRequired: true, needsMfaSetup: true });
     const a = validateSession(db, createSession(db, admin, {}, T0).token, T0)!;
-    expect(a).toMatchObject({ mfaRequired: true, needsMfaSetup: true });
+    expect(a).toMatchObject({ mfaRequired: false, needsMfaSetup: false });
+    db.prepare("UPDATE users SET mfa_required = 1 WHERE id = ?").run(admin);
+    expect(validateSession(db, createSession(db, admin, {}, T0).token, T0)).toMatchObject({ mfaRequired: true, needsMfaSetup: true });
     db.prepare("UPDATE users SET mfa_enabled_at = ? WHERE id = ?").run(T0, admin);
     expect(validateSession(db, createSession(db, admin, {}, T0).token, T0)).toMatchObject({ mfaEnabled: true, needsMfaSetup: false });
   });
