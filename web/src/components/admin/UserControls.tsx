@@ -112,7 +112,9 @@ export function UserControls({
 
       {isSelf ? (
         <div className="space-y-2">
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">This is you: you cannot remove your own admin role, disable yourself or reset your own password here.</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            This is you: you cannot remove your own admin role, disable yourself or reset your own password here. Stopping the MFA requirement keeps your authenticator; turn that off at <code className="font-mono">/account/mfa</code>.
+          </p>
           {requireForm}
         </div>
       ) : (
@@ -143,7 +145,7 @@ export function UserControls({
           )}
           {requireForm}
           {isAdmin ? (
-            <p className="basis-full text-xs text-zinc-500 dark:text-zinc-400">An admin&apos;s MFA can only be reset from the server: <code className="font-mono">{BREAKGLASS_RESET_MFA}</code>
+            <p className="basis-full text-xs text-zinc-500 dark:text-zinc-400">Stopping the requirement keeps an admin&apos;s authenticator. An admin&apos;s MFA can only be reset from the server:<code className="font-mono">{BREAKGLASS_RESET_MFA}</code>
             </p>
           ) : (
             mfaEnabled && (

@@ -302,6 +302,17 @@ describe("setMfaRequired", () => {
     expect(actions()).toEqual(["mfa.required_cleared", "mfa.reset_by_admin"]);
   });
 
+  it("a repeated or forged 'stop' does not strip the MFA of a user it was never required for", () => {
+    const member = enrolled("member@example.com", ["viewer"]);
+    db.prepare("UPDATE users SET mfa_required = 0 WHERE id = ?").run(member);
+    const { token } = createSession(db, member, {}, T0);
+    expect(setMfaRequired(db, admin, member, false, ctx)).toEqual({ ok: true });
+    expect(db.prepare("SELECT mfa_enabled_at AS e FROM users WHERE id = ?").get(member)).toEqual({ e: T0 });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM recovery_codes WHERE user_id = ?").get(member)).toEqual({ n: 1 });
+    expect(validateSession(db, token, T0)).not.toBeNull();
+    expect(actions()).toEqual([]);
+  });
+
   it("stopping it for an administrator, yourself included, leaves their authenticator in place", () => {
     const other = enrolled("other-admin@example.com", ["admin"]);
     db.prepare("UPDATE users SET mfa_required = 1, mfa_enabled_at = ? WHERE id = ?").run(T0, admin);

@@ -221,18 +221,26 @@ export function regenerateRecoveryCodes(db: DatabaseSync, key: Buffer, userId: s
  * sessions end; this one stays.
  */
 export function disableOwnMfa(db: DatabaseSync, key: Buffer, session: { tokenHash: string; userId: string }, input: string, ctx: MfaCtx): MfaResult {
-  const user = findUserById(db, session.userId);
-  if (!user || !rolesOf(db, user.id).includes("admin")) return { ok: false, error: "Only an administrator can turn their own MFA off. Ask an administrator." };
-  if (user.mfa_required === 1) return { ok: false, error: "MFA is required for your account. Stop requiring it on the Users screen first." };
+  const refusal = (): string | null => {
+    const user = findUserById(db, session.userId);
+    if (!user || !rolesOf(db, user.id).includes("admin")) return "Only an administrator can turn their own MFA off. Ask an administrator.";
+    if (user.mfa_required === 1) return "MFA is required for your account. Stop requiring it on the Users screen first.";
+    return null;
+  };
+  const early = refusal();
+  if (early) return { ok: false, error: early };
   const proof = proveFactor(db, key, session.userId, input, ctx);
   if (!proof.ok) return proof;
   const now = ctx.now ?? Date.now();
-  transaction(db, () => {
+  // Checked again under the write lock: the role or the requirement may have changed since the first look.
+  return transaction(db, (): MfaResult => {
+    const late = refusal();
+    if (late) return { ok: false, error: late };
     clearMfa(db, session.userId);
     revokeSessions(db, session.userId, session.tokenHash);
     audit(db, { action: "mfa.disabled", actor: session.userId, target: session.userId, ip: ctx.ip }, now);
+    return { ok: true };
   });
-  return { ok: true };
 }
 
 /** Removes everything MFA for a user. Callers decide who may do this and end the sessions. */

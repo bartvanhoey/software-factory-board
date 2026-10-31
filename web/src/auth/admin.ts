@@ -142,14 +142,11 @@ export function setMfaRequired(db: DatabaseSync, actorId: string, targetId: stri
   return asAdmin(db, actorId, "mfa.require", targetId, ctx, (now) => {
     const target = findUserById(db, targetId);
     if (!target) return { ok: false, error: NOT_FOUND };
-    const flagChanged = (target.mfa_required === 1) !== required;
-    const removesMfa = !required && target.mfa_enabled_at !== null && !rolesOf(db, targetId).includes("admin");
-    if (!flagChanged && !removesMfa) return { ok: true };
-    if (flagChanged) {
-      db.prepare("UPDATE users SET mfa_required = ? WHERE id = ?").run(required ? 1 : 0, targetId);
-      audit(db, { action: required ? "mfa.required_set" : "mfa.required_cleared", actor: actorId, target: targetId, ip: ctx.ip }, now);
-    }
-    if (removesMfa) {
+    if ((target.mfa_required === 1) === required) return { ok: true };
+    db.prepare("UPDATE users SET mfa_required = ? WHERE id = ?").run(required ? 1 : 0, targetId);
+    audit(db, { action: required ? "mfa.required_set" : "mfa.required_cleared", actor: actorId, target: targetId, ip: ctx.ip }, now);
+    // Only when the requirement itself is lifted: a repeated or forged "false" must not strip a voluntary MFA.
+    if (!required && target.mfa_enabled_at !== null && !rolesOf(db, targetId).includes("admin")) {
       clearMfa(db, targetId);
       revokeSessions(db, targetId);
       audit(db, { action: "mfa.reset_by_admin", actor: actorId, target: targetId, ip: ctx.ip }, now);
