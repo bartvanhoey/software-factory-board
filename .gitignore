@@ -372,3 +372,6 @@ next-env.d.ts
 auth.db
 auth.db-shm
 auth.db-wal
+
+
+recovery-codes-mfa.png
