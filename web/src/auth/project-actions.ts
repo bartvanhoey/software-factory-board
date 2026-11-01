@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { denyNonAdmin, type AdminCtx, type Done } from "./admin";
 import { requestContext, requireAccess, type AppSession } from "./dal";
 import { getDb } from "./db";
+import { lookupDefaultBranch } from "@/lib/repo";
 import { createProject, getProject, setProjectArchived, setProjectEnabled, updateProject } from "./projects";
 import { hasRole } from "./users";
 
@@ -85,6 +86,17 @@ function finish(result: Done, message: string, form: FormData): ProjectState {
   revalidatePath("/admin/projects");
   revalidatePath("/");
   return { message };
+}
+
+/**
+ * Looks up a repository's default branch on GitHub for the add form. Open to the same people who can add a project; the
+ * board's read-only token is used when there is one and never leaves the server.
+ */
+export async function lookupBranchAction(repo: string): Promise<{ branch?: string; error?: string }> {
+  await actor("project.lookup");
+  if (typeof repo !== "string") return { error: "Enter the repository as owner/name first." };
+  const found = await lookupDefaultBranch(repo.trim(), process.env.BOARD_GITHUB_TOKEN || undefined);
+  return found.ok ? { branch: found.branch } : { error: found.error };
 }
 
 export async function createProjectAction(_prev: ProjectState, form: FormData): Promise<ProjectState> {
