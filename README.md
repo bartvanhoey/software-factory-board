@@ -6,10 +6,11 @@ A software factory that runs in a Docker container and uses Claude Code to turn 
 The factory comes with a web application that shows:
 
 - **Issue Board:** every issue in its lane, from `ready` to `done`.
+- **Issue creation:** create an issue for an enabled project directly from the board.
 - **Users:** who may log in, and with which role.
 - **Projects:** the GitHub repositories the factory works on.
 
-Create an issue and label it `ready`. The software factory then:
+Create an issue and optionally label it `ready` (the web form can do both). The software factory then:
 
 1. **Builds** it with Claude Code on its own branch.
 2. **Tests** it.
@@ -42,9 +43,10 @@ A person always does the final merge. The web application sits behind a login, s
    # Needed only for the factory to build; leave empty to just look around
    CLAUDE_CODE_OAUTH_TOKEN=<your Claude Code token>
 
-   # GitHub tokens: two separate ones, never reuse one for the other
+   # GitHub tokens: separate tokens, never reuse one for another
    RUNNER_GITHUB_TOKEN=<token the factory builds with: writes branches, issues and pull requests>
    BOARD_GITHUB_TOKEN=<read-only token for the board; leave empty to see demo data>
+   ISSUE_GITHUB_TOKEN=<optional token for creating issues from the board>
 
    # Plain http on localhost
    COOKIE_SECURE=false
@@ -62,16 +64,16 @@ A person always does the final merge. The web application sits behind a login, s
 
    **Claude Code token:** install [Claude Code](https://claude.com/claude-code), run `claude setup-token` and follow the login. It prints a long-lived token (it needs a Claude subscription).
 
-   **GitHub tokens:** create two separate fine-grained tokens at <https://github.com/settings/personal-access-tokens/new>. For each one, under *Repository access* choose *Only select repositories* and pick the repositories the factory will work on. Then under *Repository permissions* set exactly this and leave everything else on *No access*:
+   **GitHub tokens:** create separate fine-grained tokens at <https://github.com/settings/personal-access-tokens/new>. For each one, under *Repository access* choose *Only select repositories* and pick the repositories the factory will work on. Then under *Repository permissions* set exactly this and leave everything else on *No access*:
 
-   | Repository permission | `RUNNER_GITHUB_TOKEN` | `BOARD_GITHUB_TOKEN` |
-   | --- | --- | --- |
-   | Issues | **Read and write** | Read-only |
-   | Pull requests | **Read and write** | Read-only |
-   | Contents | **Read and write** | Read-only |
-   | Commit statuses | No access | Read-only |
+   | Repository permission | `RUNNER_GITHUB_TOKEN` | `BOARD_GITHUB_TOKEN` | `ISSUE_GITHUB_TOKEN` |
+   | --- | --- | --- | --- |
+   | Issues | **Read and write** | Read-only | **Read and write** |
+   | Pull requests | **Read and write** | Read-only | No access |
+   | Contents | **Read and write** | Read-only | No access |
+   | Commit statuses | No access | Read-only | No access |
 
-   The board token must never be able to write: it only displays what is on GitHub.
+   The board token must never be able to write: it only displays what is on GitHub. `ISSUE_GITHUB_TOKEN` is optional and only for issue creation; issues are authored by the token's GitHub account, not the logged-in board user.
 
 3. Start it from the project root, the folder that contains `docker-compose.yml` and your `.env` file:
 

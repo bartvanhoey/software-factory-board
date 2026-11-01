@@ -2,7 +2,7 @@
 
 A self-hosted board that shows how software work moves through an automated factory. Each company runs its own copy, so nothing is shared between companies.
 
-You label a GitHub issue `ready`. A runner builds it with Claude Code in an isolated worktree, a second pass tests it, a third reviews it, and only after the review approves does the factory open a pull request. The web board shows every issue in its lane, and sits behind a login with roles, multi-factor authentication and an audit log.
+You can create GitHub issues from the web board, or label one `ready`. A runner builds it with Claude Code in an isolated worktree, a second pass tests it, a third reviews it, and only after the review approves does the factory open a pull request. The web board shows every issue in its lane, and sits behind a login with roles, multi-factor authentication and an audit log.
 
 ## How it works
 
@@ -41,6 +41,7 @@ Fill in `.env`:
 | `CLAUDE_CODE_OAUTH_TOKEN` | Your Claude Code token (runner only) |
 | `RUNNER_GITHUB_TOKEN` | A token that can write issues, pull requests and contents (runner only) |
 | `BOARD_GITHUB_TOKEN` | A separate read-only token for the board. Leave it empty to see demo data |
+| `ISSUE_GITHUB_TOKEN` | Optional separate token with Issues: read/write for creating issues from the board |
 | `MFA_ENCRYPTION_KEY` | 32 random bytes, base64. The web container refuses to start without it |
 | `RUNNER_API_TOKEN` | 32 or more random bytes, base64. The runner uses it to fetch the projects from the web app. The web container refuses to start without it |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | The first administrator (12 to 128 characters) |
@@ -148,7 +149,8 @@ Access to the server is the authorisation: anyone who can run `docker exec` can 
 | `RUNNER_API_TOKEN` | yes | | Lets the runner fetch the projects from the web app (at least 32 random bytes, base64) |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | first start | | Creates the first administrator when none exists |
 | `BOARD_GITHUB_TOKEN` | no | | Read-only token for the board. Empty means demo data |
-| `RUNNER_GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN` | for the runner | | Runner credentials, never given to the web container |
+| `ISSUE_GITHUB_TOKEN` | no | | Optional Issues: read/write token for board issue creation. The token's account authors those issues |
+| `RUNNER_GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN` | for the runner | | Runner credentials; the runner token is never given to the web container |
 | `COOKIE_SECURE` | no | on in production | `false` for plain http on localhost |
 | `TRUST_PROXY` | no | `false` | Believe `X-Forwarded-For` from a proxy you control |
 | `EMAIL_VERIFICATION` | no | `false` | Email verification and reset by email |

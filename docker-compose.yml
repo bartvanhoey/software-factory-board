@@ -62,10 +62,11 @@ services:
     image: software-factory-runner:dev
     command: ["npm", "run", "start", "-w", "web", "--", "-p", "2999", "-H", "0.0.0.0"]
 
-    # Read-only dashboard. It gets its own read-only token, never the runner's
-    # RUNNER_GITHUB_TOKEN (which can write) or ANTHROPIC_API_KEY. Empty token = demo data.
+    # The board gets a read-only token plus a separate issue-only write token. It never gets the runner's
+    # RUNNER_GITHUB_TOKEN (which can write branches and pull requests) or ANTHROPIC_API_KEY.
     environment:
       BOARD_GITHUB_TOKEN: ${BOARD_GITHUB_TOKEN:-}
+      ISSUE_GITHUB_TOKEN: ${ISSUE_GITHUB_TOKEN:-}
       FACTORY_DEMO: ${FACTORY_DEMO:-}
       # Only read once, to import projects/*.json when the project table is empty. After that the table is the registry.
       FACTORY_PROJECTS_DIR: /app/projects
