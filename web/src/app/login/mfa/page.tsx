@@ -10,12 +10,12 @@ export default async function MfaLoginPage() {
   const session = await requirePendingMfa();
   return (
     <AuthCard title="Enter your code">
-      <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="mb-4 text-sm text-muted">
         Your password was accepted for <strong>{session.email}</strong>. Enter the 6-digit code from your authenticator app, or one of your recovery codes. You have five minutes.
       </p>
       <CodeForm action={verifyMfaAction} label="Code" submit="Continue" hint="For example 123456, or ABCD-EFGH-JKMN." />
       <form action={logoutAction} className="mt-6">
-        <button type="submit" className="text-sm text-zinc-600 underline dark:text-zinc-400">
+        <button type="submit" className="text-sm text-muted underline">
           Cancel and log out
         </button>
       </form>

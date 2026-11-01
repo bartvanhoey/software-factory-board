@@ -1,32 +1,23 @@
-import Link from "next/link";
-import { UserMenu } from "@/components/auth/UserMenu";
 import type { BoardData } from "@/lib/types";
-import { ThemeToggle } from "./ThemeToggle";
 
-export function Header({
-  board,
-  title = "Software Factory Board",
-}: {
-  board: BoardData;
-  title?: string;
-}) {
+/** Page heading with the board's data-source line. */
+export function Header({ board, title = "Board" }: { board: BoardData; title?: string }) {
   const time = new Date(board.fetchedAt).toLocaleTimeString("en-GB", {
     timeZone: "UTC",
   });
   return (
-    <header className="mb-6 flex flex-wrap items-baseline justify-between gap-2">
-      <h1 className="text-xl font-semibold tracking-tight">
-        <Link href="/">{title}</Link>
-      </h1>
-
-      <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          {board.source === "live" ? "Live from GitHub" : "Demo data"} · updated{" "}
-          {time} UTC · refreshes every 30 s
-        </p>
-        <ThemeToggle />
-        <UserMenu />
-      </div>
+    <header className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-1">
+      <h1 className="page-title">{title}</h1>
+      <p className="flex items-center gap-2 text-sm text-muted">
+        <span
+          aria-hidden="true"
+          className={`size-2 shrink-0 rounded-full ${board.source === "live" ? "bg-emerald-500" : "bg-amber-500"}`}
+        />
+        <span>
+          {board.source === "live" ? "Live from GitHub" : "Demo data"} · updated {time} UTC
+          <span className="max-sm:hidden"> · refreshes every 30 s</span>
+        </span>
+      </p>
     </header>
   );
 }
@@ -34,14 +25,9 @@ export function Header({
 export function DemoBanner({ board }: { board: BoardData }) {
   if (board.source !== "demo") return null;
   return (
-    <p
-      role="status"
-      className="mb-6 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
-    >
-      Showing demo data ({board.demoReason}). Set{" "}
-      <code className="font-mono">BOARD_GITHUB_TOKEN</code> in{" "}
-      <code className="font-mono">web/.env.local</code> to see the projects in{" "}
-      <code className="font-mono">projects/</code>.
+    <p role="status" className="alert alert-warn mb-6">
+      Showing demo data ({board.demoReason}). Set <code className="font-mono">BOARD_GITHUB_TOKEN</code> in{" "}
+      <code className="font-mono">web/.env.local</code> to see the projects in <code className="font-mono">projects/</code>.
     </p>
   );
 }

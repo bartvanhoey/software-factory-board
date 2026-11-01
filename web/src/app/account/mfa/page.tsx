@@ -9,7 +9,7 @@ import { CodeForm } from "@/components/auth/CodeForm";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "MFA · Software Factory Board" };
 
-const primary = "inline-block rounded bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300";
+const primary = "btn btn-primary";
 
 export default async function MfaPage({ searchParams }: { searchParams: Promise<{ off?: string }> }) {
   const session = await requireState("/account/mfa");
@@ -22,11 +22,11 @@ export default async function MfaPage({ searchParams }: { searchParams: Promise<
       {!session.mfaEnabled ? (
         <>
           {justTurnedOff && (
-            <p role="status" className="mb-4 rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+            <p role="status" className="alert alert-success mb-4">
               MFA is turned off. Your other sessions have ended.
             </p>
           )}
-          <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="mb-4 text-sm text-muted">
             MFA is <strong>off</strong>. With it on, you also enter a code from an authenticator app each time you log in.
           </p>
           <div className="flex flex-wrap gap-3">
@@ -35,14 +35,14 @@ export default async function MfaPage({ searchParams }: { searchParams: Promise<
                 Go to the board
               </Link>
             )}
-            <Link href="/account/mfa/setup" className={justTurnedOff ? "inline-block rounded border border-zinc-300 px-3 py-2 text-sm font-medium dark:border-zinc-700" : primary}>
+            <Link href="/account/mfa/setup" className={justTurnedOff ? "btn" : primary}>
               Turn on MFA
             </Link>
           </div>
         </>
       ) : (
         <div className="space-y-8">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="text-sm text-muted">
             MFA is <strong>on</strong>{session.mfaRequired ? " and required for your account" : ""}.{" "}
             {isAdmin
               ? session.mfaRequired
@@ -54,7 +54,7 @@ export default async function MfaPage({ searchParams }: { searchParams: Promise<
             <h2 id="codes" className="mb-1 font-semibold">
               Recovery codes
             </h2>
-            <p className={`mb-3 text-sm ${left <= 2 ? "text-red-700 dark:text-red-300" : "text-zinc-600 dark:text-zinc-400"}`}>
+            <p className={`mb-3 text-sm ${left <= 2 ? "text-bad" : "text-muted"}`}>
               {left} unused code{left === 1 ? "" : "s"} left{left <= 2 ? ". Get new ones soon." : "."}
             </p>
             <CodeForm
@@ -69,7 +69,7 @@ export default async function MfaPage({ searchParams }: { searchParams: Promise<
             <h2 id="replace" className="mb-1 font-semibold">
               Replace your authenticator
             </h2>
-            <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">Moving to a new phone? Prove a current code, then scan a new key. Your other sessions will end.</p>
+            <p className="mb-3 text-sm text-muted">Moving to a new phone? Prove a current code, then scan a new key. Your other sessions will end.</p>
             <CodeForm action={startReenrolmentAction} label="Current code" submit="Continue" hint="A code from your app, or a recovery code." />
           </section>
           {isAdmin && !session.mfaRequired && (
@@ -77,14 +77,14 @@ export default async function MfaPage({ searchParams }: { searchParams: Promise<
               <h2 id="turn-off" className="mb-1 font-semibold">
                 Turn off MFA
               </h2>
-              <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">Prove a current code to remove your authenticator and recovery codes. Your other sessions will end.</p>
+              <p className="mb-3 text-sm text-muted">Prove a current code to remove your authenticator and recovery codes. Your other sessions will end.</p>
               <CodeForm action={disableOwnMfaAction} label="Current code" submit="Turn off MFA" hint="A code from your app, or a recovery code." />
             </section>
           )}
         </div>
       )}
       <p className="mt-8 text-sm">
-        <Link href="/" className="text-zinc-600 underline dark:text-zinc-400">
+        <Link href="/" className="text-muted underline">
           Back to the board
         </Link>
       </p>

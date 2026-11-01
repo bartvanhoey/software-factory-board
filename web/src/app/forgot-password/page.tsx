@@ -11,14 +11,14 @@ export default function ForgotPasswordPage() {
   if (!getAuthConfig().emailVerification) notFound();
   return (
     <AuthCard title="Forgot your password?">
-      <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">Enter the email address of your account and we will send you a link to choose a new password.</p>
+      <p className="mb-4 text-sm text-muted">Enter the email address of your account and we will send you a link to choose a new password.</p>
       <AuthForm
         action={forgotPasswordAction}
         submit="Send me a link"
         fields={[{ name: "email", label: "Email", type: "email", autoComplete: "username" }]}
       />
       <p className="mt-6 text-sm">
-        <Link href="/login" className="text-zinc-600 underline dark:text-zinc-400">
+        <Link href="/login" className="text-muted underline">
           Back to log in
         </Link>
       </p>

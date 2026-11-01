@@ -19,9 +19,9 @@ export default async function ResetPasswordPage({ searchParams }: { searchParams
   if (!tokenIsLive(getDb(), token, "reset")) {
     return (
       <AuthCard title="This link does not work">
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">{INVALID_LINK}</p>
+        <p className="text-sm text-muted">{INVALID_LINK}</p>
         <p className="mt-4 text-sm">
-          <Link href="/forgot-password" className="font-medium underline">
+          <Link href="/forgot-password" className="link">
             Ask for a new link
           </Link>
         </p>
@@ -31,7 +31,7 @@ export default async function ResetPasswordPage({ searchParams }: { searchParams
 
   return (
     <AuthCard title="Choose a new password">
-      <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="mb-4 text-sm text-muted">
         This ends all your logins on other devices. If you use multi-factor authentication you will still need your code to log in.
       </p>
       <AuthForm

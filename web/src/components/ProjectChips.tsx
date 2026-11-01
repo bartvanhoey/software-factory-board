@@ -13,10 +13,10 @@ export function ProjectChips({ projects, selected }: { projects: readonly Projec
       <Link
         href="/"
         aria-current={selected.length === 0 ? "true" : undefined}
-        className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-2 text-sm sm:py-1 ${
+        className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3.5 py-2 text-sm font-medium transition-colors sm:py-1 ${
           selected.length === 0
-            ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
-            : "border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+            ? "border-accent bg-accent text-accent-fg"
+            : "border-line-strong bg-surface text-muted hover:bg-subtle hover:text-fg"
         }`}
       >
         All projects
@@ -29,19 +29,19 @@ export function ProjectChips({ projects, selected }: { projects: readonly Projec
             key={p.info.name}
             href={hrefFor(toggleProject(selected, p.info.name))}
             aria-current={isSelected ? "true" : undefined}
-            className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3 py-2 text-sm sm:py-1 ${
+            className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3.5 py-2 text-sm font-medium transition-colors sm:py-1 ${
               isSelected
-                ? "border-zinc-900 bg-zinc-100 dark:border-zinc-100 dark:bg-zinc-800"
-                : "border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                ? "border-accent bg-accent-soft text-accent-soft-fg"
+                : "border-line-strong bg-surface text-muted hover:bg-subtle hover:text-fg"
             } ${p.status === "disabled" ? "opacity-60" : ""}`}
           >
             <span className={`size-2 rounded-full ${projectColor(p.info.name).dot}`} aria-hidden="true" />
             {p.info.name}
-            {p.status === "ok" && <span className="text-zinc-500 dark:text-zinc-400">{open} open</span>}
-            {p.status === "error" && <span className="font-medium text-red-700 dark:text-red-400">error</span>}
-            {p.status === "disabled" && <span className="text-zinc-500 dark:text-zinc-400">disabled</span>}
+            {p.status === "ok" && <span className="font-normal opacity-70">{open} open</span>}
+            {p.status === "error" && <span className="badge badge-bad">error</span>}
+            {p.status === "disabled" && <span className="font-normal opacity-70">disabled</span>}
             {!p.info.hasTests && p.status !== "disabled" && (
-              <span className="rounded bg-zinc-200 px-1.5 text-xs text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200">
+              <span className="badge badge-neutral">
                 no tests
               </span>
             )}
@@ -58,7 +58,7 @@ export function ProjectErrors({ projects }: { projects: readonly ProjectResult[]
   return (
     <div
       role="alert"
-      className="mb-4 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-200"
+      className="mb-4 alert alert-error"
     >
       <p className="font-medium">
         {failed.length} project{failed.length === 1 ? "" : "s"} could not be loaded:

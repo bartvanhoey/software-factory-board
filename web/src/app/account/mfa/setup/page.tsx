@@ -29,11 +29,11 @@ export default async function MfaSetupPage() {
         intro={
           <>
             {session.needsMfaSetup && (
-              <p role="status" className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
+              <p role="status" className="mb-4 alert alert-warn">
                 MFA is required for your account. Set it up to continue.
               </p>
             )}
-            <ol className="mb-4 list-decimal space-y-1 pl-5 text-sm text-zinc-600 dark:text-zinc-400">
+            <ol className="mb-4 list-decimal space-y-1 pl-5 text-sm text-muted">
               <li>Open an authenticator app (any app that supports one-time codes) and add an account.</li>
               <li>Scan this code, or type the key below.</li>
               <li>Enter the 6-digit code the app shows to confirm.</li>
@@ -43,7 +43,7 @@ export default async function MfaSetupPage() {
               aria-label="QR code for your authenticator app"
               viewBox={`${-pad} ${-pad} ${size + 2 * pad} ${size + 2 * pad}`}
               shapeRendering="crispEdges"
-              className="mb-3 h-56 w-56 rounded border border-zinc-300 bg-white"
+              className="mb-3 h-56 w-56 rounded-lg border border-line bg-white p-2"
             >
               <path d={d} fill="#000" />
             </svg>

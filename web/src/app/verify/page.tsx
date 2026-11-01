@@ -21,9 +21,9 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
   if (!live) {
     return (
       <AuthCard title="This link does not work">
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">{INVALID_LINK}</p>
+        <p className="text-sm text-muted">{INVALID_LINK}</p>
         <p className="mt-4 text-sm">
-          <Link href="/login" className="font-medium underline">
+          <Link href="/login" className="link">
             Log in
           </Link>{" "}
           to ask for a new one.
@@ -38,18 +38,18 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
   if (!session || session.mfaPending || session.userId !== live.userId) {
     return (
       <AuthCard title="Log in to confirm">
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="text-sm text-muted">
           This link confirms the email address of an account. Log in to that account first, then open the link again, so we know it is you.
         </p>
-        <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="mt-4 text-sm text-muted">
           Did not create an account? Do not log in: ignore this email. If an account already exists for your address and it is not yours, use{" "}
-          <Link href="/forgot-password" className="font-medium underline">
+          <Link href="/forgot-password" className="link">
             Forgot your password?
           </Link>{" "}
           to take it over.
         </p>
         <p className="mt-4 text-sm">
-          <Link href="/login" className="font-medium underline">
+          <Link href="/login" className="link">
             Log in
           </Link>
         </p>
@@ -61,7 +61,7 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
   // and a GET that confirmed would use the link up.
   return (
     <AuthCard title="Confirm your email address">
-      <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">Press the button to confirm that this address is yours.</p>
+      <p className="mb-4 text-sm text-muted">Press the button to confirm that this address is yours.</p>
       <AuthForm action={confirmEmailAction} fields={[]} submit="Confirm my email" hidden={{ token }} />
     </AuthCard>
   );

@@ -32,8 +32,8 @@ export const NEW_PROJECT: ProjectValues = {
 /** The inputs that sit under "Advanced settings" when adding a project: an error about one of them opens that section. */
 const ADVANCED_FIELDS = ["defaultBranch", "stack","maxTurns", "qaMaxTurns", "reviewMaxTurns", "maxReworks", "commandBuild", "commandTest"];
 
-const input = "mt-1 block w-full rounded border border-zinc-300 bg-white px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900";
-const button = "rounded border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 aria-disabled:opacity-60 dark:border-zinc-700 dark:hover:bg-zinc-800";
+const input = "input mt-1";
+const button = "btn btn-sm";
 
 /** An action that returns an error resets an uncontrolled form, so what was typed comes back from the server. */
 const typed = (state: ProjectState, name: string, initial: string | number): string => {
@@ -45,13 +45,13 @@ const ticked = (state: ProjectState, name: string, initial: boolean): boolean =>
 function Feedback({ state, id }: { state: ProjectState; id?: string }) {
   if (state.error) {
     return (
-      <p id={id} role="alert" className="mt-1 text-xs text-red-700 dark:text-red-300">
+      <p id={id} role="alert" className="mt-1 text-xs text-bad">
         {state.error}
       </p>
     );
   }
   return state.message ? (
-    <p role="status" className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+    <p role="status" className="mt-1 text-xs text-muted">
       {state.message}
     </p>
   ) : null;
@@ -76,11 +76,11 @@ function Field({
   const hintId = useId();
   const describedBy = [hint ? hintId : null, invalid ? errorId : null].filter(Boolean).join(" ") || undefined;
   return (
-    <label className="block text-xs" data-field={name}>
+    <label className="block text-sm" data-field={name}>
       <span className="font-medium">{label}</span>
       {children({ "aria-describedby": describedBy, ...(invalid ? { "aria-invalid": true } : {}) })}
       {hint && (
-        <span id={hintId} className="mt-0.5 block text-zinc-500 dark:text-zinc-400">
+        <span id={hintId} className="mt-0.5 block text-xs text-muted">
           {hint}
         </span>
       )}
@@ -253,9 +253,9 @@ export function ProjectForm({ mode, values, isAdmin, locked = false }: { mode: "
   // Adding: the two things that matter, then the rest folded away. Editing: everything, as before.
   const advanced = (rest: ReactNode) =>
     creating ? (
-      <details open={advancedOpen || advancedFailing} onToggle={(e) => setAdvancedOpen(e.currentTarget.open)} className="rounded border border-zinc-200 p-3 dark:border-zinc-800">
-        <summary className="cursor-pointer text-sm font-medium hover:underline">
-          Advanced settings <span className="font-normal text-zinc-500 dark:text-zinc-400">(the defaults suit most projects)</span>
+      <details open={advancedOpen || advancedFailing} onToggle={(e) => setAdvancedOpen(e.currentTarget.open)} className="panel">
+        <summary>
+          Advanced settings <span className="font-normal text-muted">(the defaults suit most projects)</span>
         </summary>
         <div className="mt-3 space-y-3">
           {branchField}
@@ -270,7 +270,7 @@ export function ProjectForm({ mode, values, isAdmin, locked = false }: { mode: "
   return (
     <form ref={formRef} action={action} className="space-y-3">
       {editing && <input type="hidden" name="version" value={values.version} />}
-      {locked && <p className="text-xs text-zinc-600 dark:text-zinc-400">This project is switched on, so only an Administrator can change it. Switch it off first to edit it.</p>}
+      {locked && <p className="text-xs text-muted">This project is switched on, so only an Administrator can change it. Switch it off first to edit it.</p>}
       <fieldset disabled={locked} className="space-y-3">
         <legend className="sr-only">{editing ? `Settings of ${values.name}` : "New project"}</legend>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -295,9 +295,9 @@ export function ProjectForm({ mode, values, isAdmin, locked = false }: { mode: "
 
         {advanced(<>
         <fieldset className="flex flex-wrap gap-x-4 gap-y-1">
-          <legend className="mb-1 text-xs font-medium">Lanes that run for this project</legend>
+          <legend className="mb-1 text-sm font-medium">Lanes that run for this project</legend>
           {([["laneBuild", "build", values.lanes.build], ["laneQa", "qa", values.lanes.qa], ["laneReview", "review", values.lanes.review]] as const).map(([name, label, on]) => (
-            <label key={name} className="flex items-center gap-1 text-xs">
+            <label key={name} className="flex items-center gap-2 text-sm">
               <input type="checkbox" name={name} defaultChecked={ticked(state, name, on)} />
               {label}
             </label>
@@ -305,7 +305,7 @@ export function ProjectForm({ mode, values, isAdmin, locked = false }: { mode: "
         </fieldset>
 
         <fieldset className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <legend className="mb-1 text-xs font-medium">Limits</legend>
+          <legend className="mb-1 text-sm font-medium">Limits</legend>
           <Field label="Build turns" hint="1 to 100" {...field("maxTurns")}>
             {(a) => <input className={input} type="number" name="maxTurns" min={1} max={100} defaultValue={typed(state, "maxTurns", values.limits.maxTurns)} {...a} />}
           </Field>
@@ -322,7 +322,7 @@ export function ProjectForm({ mode, values, isAdmin, locked = false }: { mode: "
 
         {isAdmin ? (
           <fieldset className="grid gap-3 sm:grid-cols-2">
-            <legend className="mb-1 text-xs font-medium">Commands (run in the runner container)</legend>
+            <legend className="mb-1 text-sm font-medium">Commands (run in the runner container)</legend>
             <Field label="Build command" hint="One line. Used when there is no test command." {...field("commandBuild")}>
               {(a) => <input ref={buildRef} className={`${input} font-mono`} name="commandBuild" defaultValue={typed(state, "commandBuild", values.commands.build ?? "")} onChange={() => (typedBy.current.build = true)} maxLength={500} autoComplete="off" {...a} />}
             </Field>
@@ -330,17 +330,17 @@ export function ProjectForm({ mode, values, isAdmin, locked = false }: { mode: "
               {(a) => <input ref={testRef} className={`${input} font-mono`} name="commandTest" defaultValue={typed(state, "commandTest", values.commands.test ?? "")} onChange={() => (typedBy.current.test = true)} maxLength={500} autoComplete="off" {...a} />}
             </Field>
             {presetNote && (
-              <p role="status" className="text-xs text-zinc-500 sm:col-span-2 dark:text-zinc-400">
+              <p role="status" className="text-xs text-muted sm:col-span-2">
                 {presetNote}
               </p>
             )}
           </fieldset>
         ) : (
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">An Administrator sets the build and test commands and switches the project on.</p>
+          <p className="text-xs text-muted">An Administrator sets the build and test commands and switches the project on.</p>
         )}
 
         {isAdmin && !editing && (
-          <label className="flex items-center gap-1 text-xs">
+          <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="enabled" defaultChecked={ticked(state, "enabled", false)} />
             Switch it on now
           </label>
@@ -349,12 +349,12 @@ export function ProjectForm({ mode, values, isAdmin, locked = false }: { mode: "
       </fieldset>
 
       {!locked && (
-        <button type="submit" aria-disabled={pending} onClick={send} className={button}>
+        <button type="submit" aria-disabled={pending} onClick={send} className="btn btn-primary">
           {pending ? "Saving…" : editing ? "Save" : "Add project"}
         </button>
       )}
       {state.error ? (
-        <p id={errorId} ref={alertRef} tabIndex={-1} role="alert" className="mt-1 text-xs text-red-700 dark:text-red-300">
+        <p id={errorId} ref={alertRef} tabIndex={-1} role="alert" className="mt-1 text-xs text-bad">
           {state.error}
         </p>
       ) : (
@@ -394,9 +394,9 @@ export function EnableButton({ name, enabled, version, isAdmin }: { name: string
 
   if (waiting) {
     return (
-      <div className="text-xs text-zinc-500 dark:text-zinc-400">
+      <div className="text-xs text-muted">
         <span>Waiting for an Administrator</span>
-        <p ref={status} tabIndex={-1} role="status" className="mt-1 text-zinc-600 dark:text-zinc-400">
+        <p ref={status} tabIndex={-1} role="status" className="mt-1 text-muted">
           {state.message}
         </p>
       </div>

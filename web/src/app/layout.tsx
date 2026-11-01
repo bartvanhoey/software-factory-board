@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import type { ReactNode } from "react";
+import { TopBar } from "@/components/TopBar";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -20,7 +21,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>
-        <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">{children}</div>
+        <TopBar />
+        <div className="mx-auto max-w-[1600px] px-4 py-8 sm:px-6">{children}</div>
       </body>
     </html>
   );

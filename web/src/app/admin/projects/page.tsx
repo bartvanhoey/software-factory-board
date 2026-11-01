@@ -7,7 +7,7 @@ import { ArchiveButton, EnableButton, NEW_PROJECT, ProjectForm } from "@/compone
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Projects · Software Factory Board" };
 
-const summary = "cursor-pointer text-sm font-medium hover:underline";
+const summary = "cursor-pointer text-sm font-medium select-none hover:text-accent";
 
 export default async function ProjectsPage() {
   const session = await requireAccess("issue-admin");
@@ -17,13 +17,13 @@ export default async function ProjectsPage() {
 
   return (
     <main>
-      <h1 className="mb-1 text-xl font-semibold tracking-tight">Projects</h1>
-      <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
+      <h1 className="page-title">Projects</h1>
+      <p className="page-lead">
         The GitHub repositories the factory works on. {isAdmin ? "You switch a project on and set its commands." : "A project you add stays off until an Administrator switches it on."}{" "}
         A project is switched off or archived, never removed, so its history stays.
       </p>
 
-      <details className="mb-6 rounded border border-zinc-200 p-3 dark:border-zinc-800">
+      <details className="panel mb-6">
         <summary className={summary}>Add a project</summary>
         <div className="mt-3">
           <ProjectForm mode="create" values={NEW_PROJECT} isAdmin={isAdmin} />
@@ -31,21 +31,21 @@ export default async function ProjectsPage() {
       </details>
 
       {projects.length === 0 ? (
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">No projects yet.</p>
+        <p className="card p-8 text-center text-sm text-muted">No projects yet.</p>
       ) : (
         <ul className="space-y-3">
           {projects.map((p) => (
-            <li key={p.name} className="rounded border border-zinc-200 p-3 dark:border-zinc-800">
+            <li key={p.name} className="card p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h2 className="font-medium">{p.name}</h2>
-                  <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                  <h2 className="font-semibold">{p.name}</h2>
+                  <p className="mt-0.5 text-xs text-muted">
                     {p.repo} · {p.defaultBranch} · {p.stack} · lanes: {(["build", "qa", "review"] as const).filter((l) => p.lanes[l]).join(", ") || "none"}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
                   <span
-                    className={`rounded px-2 py-0.5 text-xs ${p.enabled ? "bg-green-100 text-green-900 dark:bg-green-900 dark:text-green-100" : "bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200"}`}
+                    className={`badge ${p.enabled ? "badge-ok" : "badge-neutral"}`}
                   >
                     {p.enabled ? "on" : "off"}
                   </span>
@@ -70,14 +70,14 @@ export default async function ProjectsPage() {
       )}
 
       {archived.length > 0 && (
-        <details className="mt-6 rounded border border-zinc-200 p-3 dark:border-zinc-800">
+        <details className="panel mt-6">
           <summary className={summary}>Archived ({archived.length})</summary>
           <ul className="mt-3 space-y-3">
             {archived.map((p) => (
               <li key={p.name} className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h2 className="font-medium">{p.name}</h2>
-                  <p className="text-xs text-zinc-600 dark:text-zinc-400">{p.repo}</p>
+                  <h2 className="font-semibold">{p.name}</h2>
+                  <p className="mt-0.5 text-xs text-muted">{p.repo}</p>
                 </div>
                 <ArchiveButton name={p.name} archived version={p.version} />
               </li>
