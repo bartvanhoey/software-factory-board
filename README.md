@@ -3,6 +3,7 @@
 [![CI](https://github.com/bartvanhoey/software-factory-board/actions/workflows/ci.yml/badge.svg)](https://github.com/bartvanhoey/software-factory-board/actions/workflows/ci.yml)
 
 Runs in a Docker container and uses Claude Code to build, test and review your GitHub issues, then opens a pull request. A person always does the final merge.
+
 The factory comes with a web application that shows:
 
 - **Issue Board:** every issue in its lane, from `ready` to `done`.
@@ -10,17 +11,41 @@ The factory comes with a web application that shows:
 - **Users:** who may log in, and with which role.
 - **Projects:** the GitHub repositories the factory works on.
 
-Create an issue and optionally label it `ready` (the web form can do both). The software factory then:
+Create an issue and optionally label it `ready` (the web form can do both). The factory then:
 
 1. **Builds** it with Claude Code on its own branch.
 2. **Tests** it.
 3. **Reviews** it, and opens a pull request only if the review approves.
 
-A person always does the final merge. The web application sits behind a login, so only people you approve can see it.
+The web application sits behind a login, so only people you approve can see it.
 
 ![The Issue Board: issues in their lanes, filtered by project, in light and dark mode (demo data)](docs/images/board.gif)
 
-## Getting Started
+## Quick start (Docker Hub)
+
+No source code or build needed. You need [Docker](https://docs.docker.com/get-docker/); for the factory to build you also need a Claude subscription and GitHub tokens (see [Build from source](#build-from-source), step 2).
+
+1. Download `docker-compose.release.yml` and `.env.example` into a new folder:
+
+   ```bash
+   mkdir software-factory && cd software-factory
+   curl -fsSLO https://raw.githubusercontent.com/bartvanhoey/software-factory-board/main/docker-compose.release.yml
+   curl -fsSLO https://raw.githubusercontent.com/bartvanhoey/software-factory-board/main/.env.example
+   ```
+
+2. Copy `.env.example` to `.env` and fill in the variables, as in step 2 of [Build from source](#build-from-source).
+
+3. Start it:
+
+   ```bash
+   docker compose -f docker-compose.release.yml up -d
+   ```
+
+4. Open <http://localhost:2999>, log in with the administrator you set and add your repositories on the **Projects** screen.
+
+More detail, version pinning and how releases are published: [docs/docker-hub-install.md](docs/docker-hub-install.md).
+
+## Build from source
 
 1. Clone the repository and go into its folder, the project root:
 
@@ -50,16 +75,15 @@ A person always does the final merge. The web application sits behind a login, s
 
    # Plain http on localhost
    COOKIE_SECURE=false
-   
+
    # Scheduler: runs the lanes (review, qa, build) automatically for every project that is switched on in the web app.
    # Off by default. Once on, it builds issues labelled "ready" with your tokens, so turn it on on purpose.
    # It never merges a pull request.
-   SCHEDULER_ENABLED=true
+   SCHEDULER_ENABLED=false
    # Minutes to wait after a pass ends before the next one starts (1 to 1440).
    SCHEDULER_INTERVAL_MINUTES=5
    # A single run is stopped after this many minutes (1 to 170).
    SCHEDULER_RUN_TIMEOUT_MINUTES=120
-
    ```
 
    **Claude Code token:** install [Claude Code](https://claude.com/claude-code), run `claude setup-token` and follow the login. It prints a long-lived token (it needs a Claude subscription).
@@ -87,12 +111,16 @@ A person always does the final merge. The web application sits behind a login, s
 
 5. Add your GitHub repositories on the **Projects** screen and switch them on.
 
-The scheduler is switched on in the example above, so the factory builds `ready` issues of every switched-on project by itself. To stop that, set `SCHEDULER_ENABLED=false` in `.env` and run `docker compose up -d`.
+The scheduler is off in the example above. To let the factory build `ready` issues of every switched-on project by itself, set `SCHEDULER_ENABLED=true` in `.env` and run `docker compose up -d`.
 
-## Install from Docker Hub
+## Security note
 
-No source code or build needed: see [Install from Docker Hub](docs/docker-hub-install.md).
+The dashboard is served over plain http, so the port is published on localhost only. To expose it beyond localhost, put a TLS proxy in front first and set `COOKIE_SECURE=true`; see [docker/README.md](docker/README.md).
 
 ## Learn more
 
 The full description (roles, MFA, the scheduler, configuration and known limits) is in [docs/project-description.md](docs/project-description.md).
+
+## License
+
+MIT, see [LICENSE](LICENSE).
