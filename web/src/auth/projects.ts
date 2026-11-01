@@ -1,8 +1,6 @@
 // No "server-only" or next/* imports: the testable core of the project registry. Server actions and the internal API call in here.
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { ProjectSchema, parseProject, type Project } from "@factory/shared";
+import { ProjectSchema, type Project } from "@factory/shared";
 import { denyNonAdmin, type AdminCtx, type Done } from "./admin";
 import { audit } from "./audit";
 import { transaction } from "./db";
@@ -252,39 +250,4 @@ export function setProjectArchived(db: DatabaseSync, actorId: string, name: stri
     audit(db, { action: archived ? "project.archived" : "project.restored", actor: actorId, ip: ctx.ip, detail: { name } }, now);
     return { ok: true };
   });
-}
-
-export interface ImportResult {
-  imported: string[];
-  skipped: string[];
-}
-
-/**
- * Brings projects/*.json into an empty table, once. When the table already has rows it does nothing, so a later start
- * can never undo an edit. A file that does not validate is skipped and named; the others still go in. Every project
- * comes in switched off, whatever its file says: switching one on is the Administrator's decision.
- */
-export function importProjects(db: DatabaseSync, dir: string, log: (message: string) => void = console.log, now: number = Date.now()): ImportResult {
-  const result: ImportResult = { imported: [], skipped: [] };
-  const count = db.prepare("SELECT COUNT(*) AS n FROM projects").get() as { n: number };
-  if (count.n > 0 || !existsSync(dir)) return result;
-
-  const files = readdirSync(dir).filter((f) => f.endsWith(".json")).sort();
-  transaction(db, () => {
-    const insert = db.prepare("INSERT INTO projects (name, repo, config, enabled, version, created_by, created_at, updated_by, updated_at) VALUES (?, ?, ?, ?, 1, NULL, ?, NULL, ?)");
-    for (const file of files) {
-      try {
-        const project = parseProject(JSON.parse(readFileSync(join(dir, file), "utf8")), join(dir, file));
-        project.enabled = false;
-        insert.run(project.name, project.repo, configOf(project), 0, now, now);
-        audit(db, { action: "project.imported", detail: { name: project.name, ...detailOf(project), file } }, now);
-        result.imported.push(project.name);
-      } catch (err) {
-        result.skipped.push(file);
-        log(`[projects] skipped ${file}: ${err instanceof Error ? err.message.split("\n").join(" ") : "unreadable"}`);
-      }
-    }
-  });
-  if (result.imported.length > 0) log(`[projects] imported ${result.imported.length} project(s) from ${dir}: ${result.imported.join(", ")}`);
-  return result;
 }

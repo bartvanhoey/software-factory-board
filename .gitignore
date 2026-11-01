@@ -375,3 +375,6 @@ auth.db-wal
 
 
 recovery-codes-mfa.png
+
+# The repo ships no sample projects: they are added in the web app (Admin > Projects)
+/projects/

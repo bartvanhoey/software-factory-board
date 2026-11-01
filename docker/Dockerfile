@@ -56,7 +56,6 @@ RUN userdel -r node \
 COPY --chmod=0755 docker/entrypoint.sh /usr/local/bin/factory-entrypoint
 
 # Factory code at /app, owned by root: the agent can read it but never modify it.
-# projects/ is mounted at /app/projects by compose.
 WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY shared/package.json shared/

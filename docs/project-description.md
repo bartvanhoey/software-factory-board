@@ -20,8 +20,7 @@ The lanes run by hand, or automatically once you switch the scheduler on (see [T
 | --- | --- |
 | `runner/` | The lane commands: `labels`, `build`, `qa`, `review` |
 | `web/` | The board and the login system (Next.js, App Router, Tailwind) |
-| `shared/` | Schemas and the project registry loader used by both |
-| `projects/` | Projects to import once, when the web app starts with no projects (see [projects/README.md](../projects/README.md)) |
+| `shared/` | Schemas used by both |
 | `prompts/` | The builder, qa, review and rework prompts |
 | `docker/`, `docker-compose.yml` | The hardened container setup |
 | `docs/adr/`, `GLOSSARY.md` | Accepted decisions and the project's vocabulary |
@@ -60,7 +59,7 @@ docker compose up -d --build
 
 Open <http://localhost:2999>. The first login goes through three steps: log in with `ADMIN_EMAIL` and `ADMIN_PASSWORD`, choose a new password, then set up an authenticator app and save the ten recovery codes. After the first start, remove `ADMIN_PASSWORD` from `.env`: it is only used while no administrator exists.
 
-The projects live in the web app. The first time it starts with no projects, it imports the files in `projects/`; after that, log in as an Administrator and add, edit and switch on projects on the **Projects** screen (see [Administration](#administration)). Then run the lanes inside the runner container, or switch the scheduler on (next section):
+The projects live in the web app. Log in as an Administrator and add, edit and switch on projects on the **Projects** screen (see [Administration](#administration)). Then run the lanes inside the runner container, or switch the scheduler on (next section):
 
 ```bash
 docker compose exec runner npm run runner -- labels --project <name>
@@ -185,7 +184,6 @@ You need Node.js 22 or newer (the login system uses the built-in `node:sqlite`).
 npm install
 npm test                # all workspaces
 npm run typecheck
-npm run validate        # checks the files in projects/ (the ones the web app imports once)
 ```
 
 To run the board on your machine without Docker, set the login settings and start the production build. The development server (`next dev`) has not been tried with the login system.

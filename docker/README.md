@@ -172,7 +172,6 @@ To bump a base image: `docker pull <tag>`, `docker inspect --format '{{index .Re
 | `read_only: true` | root filesystem is immutable |
 | `tmpfs` on `/tmp` (noexec) and `/home/factory` | scratch space only, wiped on restart |
 | named volumes `workspace`, `data`, `cache`, `auth` | the only persistent writable paths (`cache` holds the NuGet packages, `NUGET_PACKAGES=/cache/nuget`; `auth` is mounted in `web` only) |
-| `./projects` mounted `:ro` in `web` only | read once to import the projects when the table is empty; the runner does not mount it, and the registry is the table in `auth.db` |
 | `cap_drop: [ALL]` | empty capability set |
 | `no-new-privileges` | setuid binaries cannot escalate |
 | `pids_limit`, `mem_limit`, `cpus` | fork-bomb and runaway guards |

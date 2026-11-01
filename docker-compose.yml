@@ -68,8 +68,6 @@ services:
       BOARD_GITHUB_TOKEN: ${BOARD_GITHUB_TOKEN:-}
       CREATE_ISSUE_GITHUB_TOKEN: ${CREATE_ISSUE_GITHUB_TOKEN:-}
       FACTORY_DEMO: ${FACTORY_DEMO:-}
-      # Only read once, to import projects/*.json when the project table is empty. After that the table is the registry.
-      FACTORY_PROJECTS_DIR: /app/projects
       # The secret the runner presents to fetch the projects. Listed here because web does not read .env wholesale.
       RUNNER_API_TOKEN: ${RUNNER_API_TOKEN:-}
       # Auth settings are listed one by one, not via env_file: web must not see the runner's secrets.
@@ -101,7 +99,6 @@ services:
       - /app/web/.next/cache:rw,nosuid,uid=10001,gid=10001,mode=0700,size=256m
 
     volumes:
-      - ./projects:/app/projects:ro
       # Users, sessions and the audit log. Named volume, never a bind mount (SQLite locking on Windows).
       - auth:/auth
 
