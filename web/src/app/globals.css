@@ -13,6 +13,8 @@
   --subtle: #f2f2f5;
   --line: #e4e4ea;
   --line-strong: #d1d1da;
+  /* Form field borders: at least 3:1 against the field background (WCAG 1.4.11). */
+  --field-border: #8b8b9a;
   --fg: #16161d;
   --muted: #6b6b7b;
   --accent: #4f46e5;
@@ -39,6 +41,7 @@
   --subtle: #1b1b24;
   --line: #262633;
   --line-strong: #353546;
+  --field-border: #6b6b80;
   --fg: #ededf2;
   --muted: #9a9aad;
   --accent: #818cf8;
@@ -75,6 +78,11 @@
   --color-ok: var(--ok-fg);
   --color-warn: var(--warn-fg);
   --color-bad: var(--bad-fg);
+}
+
+/* The sticky TopBar is 3.5rem tall; keep focused and anchored elements clear of it (WCAG 2.4.11). */
+html {
+  scroll-padding-top: 4.5rem;
 }
 
 body {
@@ -118,7 +126,7 @@ h1, h2, h3 {
 
   /* Form controls */
   .input {
-    @apply block min-h-9 w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-fg shadow-xs transition-colors placeholder:text-muted focus:border-accent focus:outline-2 focus:-outline-offset-1 focus:outline-accent disabled:opacity-60;
+    @apply block min-h-9 w-full rounded-lg border border-(color:--field-border) bg-surface px-3 py-1.5 text-sm text-fg shadow-xs transition-colors placeholder:text-muted focus:border-accent focus:outline-2 focus:-outline-offset-1 focus:outline-accent disabled:opacity-60;
   }
   .label {
     @apply block text-sm font-medium;
@@ -137,13 +145,13 @@ h1, h2, h3 {
     @apply rounded-lg border px-3.5 py-2.5 text-sm;
   }
   .alert-error {
-    @apply border-(--bad-line) bg-(--bad-bg) text-(--bad-fg);
+    @apply border-(color:--bad-line) bg-(--bad-bg) text-(--bad-fg);
   }
   .alert-success {
-    @apply border-(--ok-line) bg-(--ok-bg) text-(--ok-fg);
+    @apply border-(color:--ok-line) bg-(--ok-bg) text-(--ok-fg);
   }
   .alert-warn {
-    @apply border-(--warn-line) bg-(--warn-bg) text-(--warn-fg);
+    @apply border-(color:--warn-line) bg-(--warn-bg) text-(--warn-fg);
   }
 
   /* Status pills */

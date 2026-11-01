@@ -7,6 +7,11 @@ import { loadBoard } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
+export async function generateMetadata({ params }: { params: Promise<{ name: string }> }) {
+  const { name } = await params;
+  return { title: `${decodeURIComponent(name)} · Software Factory Board` };
+}
+
 export default async function ProjectPage({ params }: { params: Promise<{ name: string }> }) {
   await requireAccess("viewer");
   const { name } = await params;

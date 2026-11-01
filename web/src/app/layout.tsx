@@ -21,8 +21,17 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>
+        <a
+          href="#main"
+          className="sr-only z-30 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-fg focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+        >
+          Skip to content
+        </a>
         <TopBar />
-        <div className="mx-auto max-w-[1600px] px-4 py-8 sm:px-6">{children}</div>
+        {/* Target of the skip link; tabIndex -1 lets it take focus without joining the tab order. */}
+        <div id="main" tabIndex={-1} className="mx-auto max-w-[1600px] px-4 py-8 focus:outline-none sm:px-6">
+          {children}
+        </div>
       </body>
     </html>
   );
