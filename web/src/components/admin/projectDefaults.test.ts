@@ -1,6 +1,35 @@
 import { ProjectSchema } from "@factory/shared";
 import { describe, expect, it } from "vitest";
-import { COMMAND_PRESETS, nameFromRepo } from "./projectDefaults";
+import { COMMAND_PRESETS, nameFromRepo, repoFromInput } from "./projectDefaults";
+
+describe("repoFromInput", () => {
+  it("turns a GitHub address into owner/name", () => {
+    for (const url of [
+      "https://github.com/bartvanhoey/AurumCoffee",
+      "https://github.com/bartvanhoey/AurumCoffee/",
+      "https://github.com/bartvanhoey/AurumCoffee.git",
+      "https://www.github.com/bartvanhoey/AurumCoffee",
+      "http://github.com/bartvanhoey/AurumCoffee",
+      "github.com/bartvanhoey/AurumCoffee",
+      "  https://github.com/bartvanhoey/AurumCoffee  ",
+      "https://github.com/bartvanhoey/AurumCoffee/tree/main/src",
+      "https://github.com/bartvanhoey/AurumCoffee?tab=readme-ov-file#readme",
+      "git@github.com:bartvanhoey/AurumCoffee.git",
+    ]) {
+      expect(repoFromInput(url), url).toBe("bartvanhoey/AurumCoffee");
+    }
+  });
+
+  it("leaves everything else as it was typed, for the form to judge", () => {
+    for (const other of ["bartvanhoey/AurumCoffee", "owner", "", "https://gitlab.com/o/r", "https://github.com/owner", "https://example.com/github.com/o/r"]) {
+      expect(repoFromInput(other)).toBe(other.trim());
+    }
+  });
+
+  it("gives a name from the pasted address", () => {
+    expect(nameFromRepo(repoFromInput("https://github.com/bartvanhoey/AurumCoffee"))).toBe("aurumcoffee");
+  });
+});
 
 describe("nameFromRepo", () => {
   it("makes a slug from the repository name", () => {

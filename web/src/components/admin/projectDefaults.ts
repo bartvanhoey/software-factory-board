@@ -1,3 +1,15 @@
+/**
+ * What a person pastes into the repository field, as owner/name: a GitHub address (https://github.com/owner/name, with
+ * or without www, a trailing slash, .git or a deeper path such as /tree/main) or an ssh one (git@github.com:owner/name.git).
+ * Anything else is returned as it was typed, for the form's own checks to judge.
+ */
+export function repoFromInput(input: string): string {
+  const value = input.trim();
+  const match = /^(?:(?:https?:\/\/)?(?:www\.)?github\.com\/|git@github\.com:)([^/\s?#]+)\/([^/\s?#]+)/i.exec(value);
+  if (!match) return value;
+  return `${match[1]}/${(match[2] ?? "").replace(/\.git$/i, "")}`;
+}
+
 /** A project name suggested from its repository: "owner/My_Repo.Web" becomes "my-repo-web". Empty when nothing usable is left. */
 export function nameFromRepo(repo: string): string {
   const name = repo.split("/")[1] ?? "";
