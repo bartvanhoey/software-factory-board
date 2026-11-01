@@ -1,8 +1,8 @@
-# Software Factory
+# Software Factory Board: GitHub issues to pull requests, with Claude Code
 
 [![CI](https://github.com/bartvanhoey/software-factory-board/actions/workflows/ci.yml/badge.svg)](https://github.com/bartvanhoey/software-factory-board/actions/workflows/ci.yml)
 
-A software factory that runs in a Docker container and uses Claude Code to turn GitHub issues into pull requests.
+Runs in a Docker container and uses Claude Code to build, test and review your GitHub issues, then opens a pull request. A person always does the final merge.
 The factory comes with a web application that shows:
 
 - **Issue Board:** every issue in its lane, from `ready` to `done`.
