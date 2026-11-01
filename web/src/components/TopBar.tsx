@@ -28,8 +28,8 @@ export async function TopBar() {
 
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-surface/85 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-4 px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-2.5 font-semibold tracking-tight">
+      <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-2 px-4 sm:gap-4 sm:px-6">
+        <Link href="/" className="flex shrink-0 items-center gap-2.5 font-semibold tracking-tight">
           <Logo />
           <span className="max-sm:sr-only">Software Factory Board</span>
         </Link>
@@ -42,14 +42,20 @@ export async function TopBar() {
             {isAdmin && (
               <NavLink href="/admin/users" prefixes={["/admin"]}>
                 Admin
-                {pending > 0 && <span className="badge badge-warn ml-1.5">{pending} pending</span>}
+                {/* On the narrowest phones only the number shows, so the theme and account buttons stay on screen. */}
+                {pending > 0 && (
+                  <span className="badge badge-warn ml-1.5">
+                    {pending}
+                    <span className="max-[420px]:sr-only"> pending</span>
+                  </span>
+                )}
               </NavLink>
             )}
             {isManager && <NavLink href="/admin/projects">Projects</NavLink>}
           </nav>
         )}
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <ThemeToggle />
           <UserMenu />
         </div>
