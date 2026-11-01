@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Placeholder entrypoint. The Node runner replaces this in the next step.
-# Prints the toolchain versions so the image can be checked at a glance.
+# Entrypoint of the web and runner containers. Prints the toolchain versions so the image can be checked at a glance,
+# then runs the command it was given.
 set -euo pipefail
 
 echo "factory sandbox: user=$(id -un) uid=$(id -u)"
