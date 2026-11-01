@@ -10,7 +10,7 @@ No source code or build needed: you only need [Docker](https://docs.docker.com/g
    curl -fsSLO https://raw.githubusercontent.com/bartvanhoey/software-factory-board/main/.env.example
    ```
 
-2. Copy `.env.example` to `.env` in the same folder and fill in the variables, as described in step 2 of [Getting Started](../README.md#getting-started). Optionally add `FACTORY_VERSION=1.0.0` to pin a version (default: `latest`).
+2. Copy `.env.example` to `.env` in the same folder and fill in the variables, as described in step 2 of [Build from source](../README.md#build-from-source). Optionally add `FACTORY_VERSION=1.0.0` to pin a version (default: `latest`).
 
 3. Start it:
 
@@ -20,7 +20,7 @@ No source code or build needed: you only need [Docker](https://docs.docker.com/g
 
    Run every later `docker compose` command with the same `-f docker-compose.release.yml`, from this same folder.
 
-4. Open <http://localhost:2999> and continue with steps 4 and 5 of [Getting Started](../README.md#getting-started). Add your repositories on the **Projects** screen.
+4. Open <http://localhost:2999> and continue with steps 4 and 5 of [Build from source](../README.md#build-from-source). Add your repositories on the **Projects** screen.
 
 ## Publishing a release (maintainers)
 
