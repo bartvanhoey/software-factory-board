@@ -1,0 +1,48 @@
+name: Release
+
+# Builds the image for amd64 and arm64 and pushes it to Docker Hub when a version tag (v1.2.3) is pushed.
+# Needs two repository secrets: DOCKERHUB_USERNAME and DOCKERHUB_TOKEN (a Docker Hub access token with
+# Read & Write permission).
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/software-factory-board
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # v1.2.3 -> tags 1.2.3, 1.2 and latest
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
