@@ -1,0 +1,114 @@
+# Release compose: pulls the published image from Docker Hub, no source code or build needed.
+# Both services run the same image; only the command and the secrets differ.
+# Pin a version in .env with FACTORY_VERSION=1.0.0 (default: latest).
+x-image: &image bartvanhoey/software-factory-board:${FACTORY_VERSION:-latest}
+
+# Shared hardening.
+x-hardened: &hardened
+  restart: unless-stopped
+  read_only: true                 # root filesystem is immutable
+  cap_drop: [ALL]                 # no Linux capabilities
+  security_opt:
+    - no-new-privileges:true      # setuid binaries cannot escalate
+  pids_limit: 512                 # fork-bomb guard
+  init: true                      # reap zombie processes
+
+services:
+  runner:
+    <<: *hardened
+    image: *image
+
+    # The scheduler. It only idles unless SCHEDULER_ENABLED=true in .env, so `up` starts no work by itself.
+    # Lanes can still be run by hand: docker compose exec runner npm run runner -- build --project <name>.
+    # node directly, not npm: npm exits on SIGTERM and the container takes the run in progress down with it.
+    command: ["node", "--import", "tsx", "runner/src/bin.ts", "schedule"]
+    # A stop forwards SIGTERM to the run in progress; this is how long it gets before docker kills the container.
+    stop_grace_period: 60s
+
+    # The runner fetches the projects from web on every pass, so it waits until web is healthy instead of failing its first pass.
+    depends_on:
+      web:
+        condition: service_healthy
+
+    # Secrets come from .env (gitignored), never from the image.
+    env_file: .env
+    environment:
+      FACTORY_WORKSPACE: /workspace
+      FACTORY_DATA: /data
+      # Package cache on a volume, not in the 512 MB RAM-backed HOME (a NuGet restore needs about 400 MB).
+      NUGET_PACKAGES: /cache/nuget
+      # The projects live in the web service (ADR 0001); RUNNER_API_TOKEN comes from .env above.
+      FACTORY_WEB_URL: http://web:2999
+      # The gh CLI only reads GH_TOKEN, so the runner's token is handed to it under that name.
+      GH_TOKEN: ${RUNNER_GITHUB_TOKEN:-}
+
+    mem_limit: 4g
+    cpus: 2.0
+
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=512m
+      # HOME holds tool config (gh, claude, dotnet). It is wiped on every restart.
+      - /home/factory:rw,nosuid,uid=10001,gid=10001,mode=0700,size=512m
+
+    volumes:
+      - workspace:/workspace        # clones and worktrees
+      - data:/data                  # events and logs
+      - cache:/cache                # NuGet package cache, survives restarts
+
+  web:
+    <<: *hardened
+    image: *image
+    command: ["npm", "run", "start", "-w", "web", "--", "-p", "2999", "-H", "0.0.0.0"]
+
+    # The board gets a read-only token plus a separate issue-only write token. It never gets the runner's
+    # RUNNER_GITHUB_TOKEN (which can write branches and pull requests) or ANTHROPIC_API_KEY.
+    environment:
+      BOARD_GITHUB_TOKEN: ${BOARD_GITHUB_TOKEN:-}
+      CREATE_ISSUE_GITHUB_TOKEN: ${CREATE_ISSUE_GITHUB_TOKEN:-}
+      FACTORY_DEMO: ${FACTORY_DEMO:-}
+      # The secret the runner presents to fetch the projects. Listed here because web does not read .env wholesale.
+      RUNNER_API_TOKEN: ${RUNNER_API_TOKEN:-}
+      # Auth settings are listed one by one, not via env_file: web must not see the runner's secrets.
+      AUTH_DB_PATH: /auth/auth.db
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
+      EMAIL_VERIFICATION: ${EMAIL_VERIFICATION:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      APP_URL: ${APP_URL:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
+      TRUST_PROXY: ${TRUST_PROXY:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+
+    # Localhost only: logins travel over plain http. Exposing it (for example "2999:2999") needs a TLS proxy in front.
+    ports:
+      - "127.0.0.1:2999:2999"
+
+    mem_limit: 1g
+    cpus: 1.0
+
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m
+      - /home/factory:rw,nosuid,uid=10001,gid=10001,mode=0700,size=64m
+      # Next writes its fetch/image cache here at runtime.
+      - /app/web/.next/cache:rw,nosuid,uid=10001,gid=10001,mode=0700,size=256m
+
+    volumes:
+      # Users, sessions and the audit log. Named volume, never a bind mount (SQLite locking on Windows).
+      - auth:/auth
+
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:2999/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  workspace:
+  data:
+  cache:
+  auth:
