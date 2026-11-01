@@ -27,7 +27,7 @@ export function DemoBanner({ board }: { board: BoardData }) {
   return (
     <p role="status" className="alert alert-warn mb-6">
       Showing demo data ({board.demoReason}). Set <code className="font-mono">BOARD_GITHUB_TOKEN</code> in{" "}
-      <code className="font-mono">web/.env.local</code> to see the projects in <code className="font-mono">projects/</code>.
+      <code className="font-mono">web/.env.local</code> to see the projects registered on the Projects screen.
     </p>
   );
 }
