@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireAccess } from "@/auth/dal";
 import { Board } from "@/components/Board";
 import { DemoBanner, Header } from "@/components/Header";
@@ -17,6 +18,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ p
     <main>
       <Header board={board} />
       <DemoBanner board={board} />
+      <div className="mb-4 flex justify-end">
+        <Link
+          className="btn btn-primary"
+          href={`/issues/new${selected.length === 1 ? `?project=${encodeURIComponent(selected[0]!)}` : ""}`}
+        >
+          Create issue
+        </Link>
+      </div>
       <ProjectChips projects={board.projects} selected={selected} />
       <ProjectErrors projects={board.projects} />
       <Board issues={selectIssues(board.projects, selected)} now={now} />
