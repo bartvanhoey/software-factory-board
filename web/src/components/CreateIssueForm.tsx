@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useId } from "react";
 import { createIssueAction, type CreateIssueState } from "@/auth/issue-actions";
 
 export interface IssueProjectOption {
@@ -21,6 +21,8 @@ export function CreateIssueForm({
   const [state, action, pending] = useActionState<CreateIssueState, FormData>(createIssueAction, {});
   const values = state.values;
   const unavailable = !configured || projects.length === 0;
+  const errorId = useId();
+  const errorProps = state.error ? { "aria-invalid": true, "aria-describedby": errorId } : {};
 
   return (
     <div className="max-w-3xl">
@@ -37,7 +39,7 @@ export function CreateIssueForm({
         <p role="status" className="alert alert-warn mb-4">There are no enabled projects to create an issue for.</p>
       )}
 
-      {state.error && <p role="alert" className="alert alert-error mb-4">{state.error}</p>}
+      {state.error && <p id={errorId} role="alert" className="alert alert-error mb-4">{state.error}</p>}
       {state.issue && (
         <div role="status" className="alert alert-success mb-4">
           Created <a className="link" href={state.issue.url} target="_blank" rel="noreferrer">{state.issue.repo}#{state.issue.number}</a>.
@@ -54,6 +56,7 @@ export function CreateIssueForm({
             required
             disabled={unavailable || pending}
             defaultValue={values?.project ?? initialProject ?? ""}
+            {...errorProps}
           >
             <option value="" disabled>Select a project</option>
             {projects.map((project) => (
@@ -71,6 +74,7 @@ export function CreateIssueForm({
             maxLength={256}
             disabled={unavailable || pending}
             defaultValue={values?.title ?? ""}
+            {...errorProps}
           />
         </label>
 
@@ -82,6 +86,7 @@ export function CreateIssueForm({
             maxLength={65_536}
             disabled={unavailable || pending}
             defaultValue={values?.body ?? ""}
+            {...errorProps}
           />
         </label>
 

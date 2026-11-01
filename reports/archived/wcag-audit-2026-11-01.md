@@ -49,18 +49,18 @@
 ## Findings
 
 ### Critical (Level A failures)
-- `web/src/app/layout.tsx:24` — 2.4.1 Bypass Blocks — No skip-to-content link before `<TopBar />`. Fix: add a visually hidden, focus-visible "Skip to content" link as the first child of `<body>` and give the content wrapper `id="main"` (pages already render their own `<main>`, so target that or the wrapper).
+- `web/src/app/layout.tsx:24` — 2.4.1 Bypass Blocks — No skip-to-content link before `<TopBar />`. Fix: add a visually hidden, focus-visible "Skip to content" link as the first child of `<body>` and give the content wrapper `id="main"` (pages already render their own `<main>`, so target that or the wrapper). ✅ Fixed 2026-11-01
 
 ### High (Level AA failures)
-- `web/src/components/ProjectChips.tsx:40` and `:42` — 1.4.3 Contrast — "N open" and "disabled" use `opacity-70` on text. Measured 2.89:1 on an unselected chip in light mode, 3.88:1 in dark, 4.14:1 on a selected project chip in light mode (4.5:1 needed at this size). Fix: drop the opacity and use `text-muted` (4.68 to 5.2:1) or a full-strength colour.
-- `web/src/app/globals.css:15` (`--line-strong`, used by `.input` at `:120`) — 1.4.11 Non-text Contrast — Input and select borders measure 1.52:1 against white (1.53:1 in dark). The field boundary must reach 3:1. Fix: add a dedicated `--field-border` around `#8b8b9a` in light and `#6b6b80` in dark and use it for `.input` only.
+- `web/src/components/ProjectChips.tsx:40` and `:42` — 1.4.3 Contrast — "N open" and "disabled" use `opacity-70` on text. Measured 2.89:1 on an unselected chip in light mode, 3.88:1 in dark, 4.14:1 on a selected project chip in light mode (4.5:1 needed at this size). Fix: drop the opacity and use `text-muted` (4.68 to 5.2:1) or a full-strength colour. ✅ Fixed 2026-11-01
+- `web/src/app/globals.css:15` (`--line-strong`, used by `.input` at `:120`) — 1.4.11 Non-text Contrast — Input and select borders measure 1.52:1 against white (1.53:1 in dark). The field boundary must reach 3:1. Fix: add a dedicated `--field-border` around `#8b8b9a` in light and `#6b6b80` in dark and use it for `.input` only. ✅ Fixed 2026-11-01
 
 ### Warnings
-- `web/src/app/page.tsx`, `web/src/app/projects/[name]/page.tsx` — 2.4.2 Page Titled (W1) — Both inherit "Software Factory Board" from the layout, so a titled page exists but is not descriptive. Fix: export `metadata` (for the project page, `generateMetadata` with the project name).
-- `web/src/components/ProjectChips.tsx:15,31` — 1.4.1 Use of Color (W2) — Selected chip state is conveyed by colour only (`aria-current` helps screen readers). Fix: add a check mark icon or a heavier border to the selected chip.
-- `web/src/components/TopBar.tsx:30` — 2.4.11 Focus Not Obscured (W3) — Sticky 56px header with no scroll offset, so focused fields can slide beneath it. Fix: `html { scroll-padding-top: 4.5rem; }` in `globals.css`.
-- `web/src/components/auth/AuthForm.tsx:43`, `web/src/components/auth/CodeForm.tsx:60` — 3.3.1 Error Identification (W4) — Error banner is `role="alert"` but not tied to the fields via `aria-describedby` or `aria-invalid` (`ProjectForm` does this correctly). Fix: give the banner an id and set `aria-describedby` and `aria-invalid` on the inputs when `state.error` is set.
-- `web/src/components/ProjectChips.tsx:36` — 1.4.3 (W5) — The whole "disabled" chip is `opacity-60`. It is still a working link, so the inactive-component exemption may not apply. Fix: use a muted colour instead of whole-element opacity, and keep the "disabled" text at full contrast.
+- `web/src/app/page.tsx`, `web/src/app/projects/[name]/page.tsx` — 2.4.2 Page Titled (W1) — Both inherit "Software Factory Board" from the layout, so a titled page exists but is not descriptive. Fix: export `metadata` (for the project page, `generateMetadata` with the project name). ✅ Fixed 2026-11-01
+- `web/src/components/ProjectChips.tsx:15,31` — 1.4.1 Use of Color (W2) — Selected chip state is conveyed by colour only (`aria-current` helps screen readers). Fix: add a check mark icon or a heavier border to the selected chip. ✅ Fixed 2026-11-01
+- `web/src/components/TopBar.tsx:30` — 2.4.11 Focus Not Obscured (W3) — Sticky 56px header with no scroll offset, so focused fields can slide beneath it. Fix: `html { scroll-padding-top: 4.5rem; }` in `globals.css`. ✅ Fixed 2026-11-01
+- `web/src/components/auth/AuthForm.tsx:43`, `web/src/components/auth/CodeForm.tsx:60` — 3.3.1 Error Identification (W4) — Error banner is `role="alert"` but not tied to the fields via `aria-describedby` or `aria-invalid` (`ProjectForm` does this correctly). Fix: give the banner an id and set `aria-describedby` and `aria-invalid` on the inputs when `state.error` is set. ✅ Fixed 2026-11-01
+- `web/src/components/ProjectChips.tsx:36` — 1.4.3 (W5) — The whole "disabled" chip is `opacity-60`. It is still a working link, so the inactive-component exemption may not apply. Fix: use a muted colour instead of whole-element opacity, and keep the "disabled" text at full contrast. ✅ Fixed 2026-11-01
 
 ## Carried Findings
 
