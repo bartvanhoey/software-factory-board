@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState } from "react";
 import { createIssueAction, type CreateIssueState } from "@/auth/issue-actions";
 
 export interface IssueProjectOption {
@@ -19,24 +19,18 @@ export function CreateIssueForm({
   initialProject?: string;
 }) {
   const [state, action, pending] = useActionState<CreateIssueState, FormData>(createIssueAction, {});
-  const [ready, setReady] = useState(false);
   const values = state.values;
   const unavailable = !configured || projects.length === 0;
-
-  useEffect(() => {
-    if (values) setReady(values.ready);
-    else if (state.issue) setReady(false);
-  }, [state, values]);
 
   return (
     <div className="max-w-3xl">
       <p className="page-lead">
-        Issues are created by the GitHub account that owns <code>ISSUE_GITHUB_TOKEN</code>, not by your app account.
+        Issues are created by the GitHub account that owns <code>CREATE_ISSUE_GITHUB_TOKEN</code>, not by your app account.
       </p>
 
       {!configured && (
         <p role="status" className="alert alert-warn mb-4">
-          Issue creation is not configured. Set <code>ISSUE_GITHUB_TOKEN</code> for the web service with Issues: write access.
+          Issue creation is not configured. Set <code>CREATE_ISSUE_GITHUB_TOKEN</code> for the web service with Issues: write access.
         </p>
       )}
       {configured && projects.length === 0 && (
@@ -92,7 +86,7 @@ export function CreateIssueForm({
         </label>
 
         <label className="flex items-start gap-2 text-sm">
-          <input className="mt-1" type="checkbox" name="ready" disabled={unavailable || pending} checked={ready} onChange={(event) => setReady(event.currentTarget.checked)} />
+          <input className="mt-1" type="checkbox" name="ready" disabled={unavailable || pending} defaultChecked={values?.ready ?? false} />
           <span>
             <span className="font-medium">Start factory work</span>
             <span className="mt-0.5 block text-xs text-muted">

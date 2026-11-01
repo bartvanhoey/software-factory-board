@@ -22,7 +22,7 @@ describe("createGitHubIssue", () => {
   });
 
   it.each([
-    [401, "ISSUE_GITHUB_TOKEN"],
+    [401, "CREATE_ISSUE_GITHUB_TOKEN"],
     [403, "Issues: write"],
     [404, "cannot access it"],
     [422, "GitHub rejected this issue"],

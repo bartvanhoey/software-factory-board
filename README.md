@@ -46,7 +46,7 @@ A person always does the final merge. The web application sits behind a login, s
    # GitHub tokens: separate tokens, never reuse one for another
    RUNNER_GITHUB_TOKEN=<token the factory builds with: writes branches, issues and pull requests>
    BOARD_GITHUB_TOKEN=<read-only token for the board; leave empty to see demo data>
-   ISSUE_GITHUB_TOKEN=<optional token for creating issues from the board>
+   CREATE_ISSUE_GITHUB_TOKEN=<optional token for creating issues from the board>
 
    # Plain http on localhost
    COOKIE_SECURE=false
@@ -66,14 +66,14 @@ A person always does the final merge. The web application sits behind a login, s
 
    **GitHub tokens:** create separate fine-grained tokens at <https://github.com/settings/personal-access-tokens/new>. For each one, under *Repository access* choose *Only select repositories* and pick the repositories the factory will work on. Then under *Repository permissions* set exactly this and leave everything else on *No access*:
 
-   | Repository permission | `RUNNER_GITHUB_TOKEN` | `BOARD_GITHUB_TOKEN` | `ISSUE_GITHUB_TOKEN` |
+   | Repository permission | `RUNNER_GITHUB_TOKEN` | `BOARD_GITHUB_TOKEN` | `CREATE_ISSUE_GITHUB_TOKEN` |
    | --- | --- | --- | --- |
    | Issues | **Read and write** | Read-only | **Read and write** |
    | Pull requests | **Read and write** | Read-only | No access |
    | Contents | **Read and write** | Read-only | No access |
    | Commit statuses | No access | Read-only | No access |
 
-   The board token must never be able to write: it only displays what is on GitHub. `ISSUE_GITHUB_TOKEN` is optional and only for issue creation; issues are authored by the token's GitHub account, not the logged-in board user.
+   The board token must never be able to write: it only displays what is on GitHub. `CREATE_ISSUE_GITHUB_TOKEN` is optional and only for issue creation; issues are authored by the token's GitHub account, not the logged-in board user.
 
 3. Start it from the project root, the folder that contains `docker-compose.yml` and your `.env` file:
 
