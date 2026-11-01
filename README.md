@@ -17,6 +17,8 @@ Create an issue and label it `ready`. The software factory then:
 
 A person always does the final merge. The web application sits behind a login, so only people you approve can see it.
 
+![The Issue Board: issues in their lanes, filtered by project, in light and dark mode (demo data)](docs/images/board.gif)
+
 ## Getting Started
 
 1. Clone the repository and go into its folder, the project root:
