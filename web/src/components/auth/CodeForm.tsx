@@ -57,7 +57,7 @@ export function CodeForm({
     {intro}
     <form action={formAction} className="space-y-3">
       {state.error && (
-        <p role="alert" className="alert alert-error">
+        <p id={`${id}-error`} role="alert" className="alert alert-error">
           {state.error}
         </p>
       )}
@@ -76,7 +76,8 @@ export function CodeForm({
           spellCheck={false}
           required
           maxLength={32}
-          aria-describedby={hint ? `${id}-hint` : undefined}
+          aria-invalid={state.error ? true : undefined}
+          aria-describedby={[hint ? `${id}-hint` : null, state.error ? `${id}-error` : null].filter(Boolean).join(" ") || undefined}
           className={input}
         />
         {hint && (

@@ -7,6 +7,15 @@ function hrefFor(selected: readonly string[]): string {
   return selected.length === 0 ? "/" : `/?project=${selected.map(encodeURIComponent).join(",")}`;
 }
 
+/** A tick on the selected chip, so the state is not shown by colour alone (WCAG 1.4.1). */
+function Check() {
+  return (
+    <svg viewBox="0 0 16 16" className="-ml-0.5 size-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m3.5 8.5 3 3 6-7" />
+    </svg>
+  );
+}
+
 export function ProjectChips({ projects, selected }: { projects: readonly ProjectResult[]; selected: readonly string[] }) {
   return (
     <nav aria-label="Filter by project" className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
@@ -19,6 +28,7 @@ export function ProjectChips({ projects, selected }: { projects: readonly Projec
             : "border-line-strong bg-surface text-muted hover:bg-subtle hover:text-fg"
         }`}
       >
+        {selected.length === 0 && <Check />}
         All projects
       </Link>
       {projects.map((p) => {
@@ -33,13 +43,14 @@ export function ProjectChips({ projects, selected }: { projects: readonly Projec
               isSelected
                 ? "border-accent bg-accent-soft text-accent-soft-fg"
                 : "border-line-strong bg-surface text-muted hover:bg-subtle hover:text-fg"
-            } ${p.status === "disabled" ? "opacity-60" : ""}`}
+            } ${p.status === "disabled" ? "border-dashed" : ""}`}
           >
+            {isSelected && <Check />}
             <span className={`size-2 rounded-full ${projectColor(p.info.name).dot}`} aria-hidden="true" />
             {p.info.name}
-            {p.status === "ok" && <span className="font-normal opacity-70">{open} open</span>}
+            {p.status === "ok" && <span className="font-normal">{open} open</span>}
             {p.status === "error" && <span className="badge badge-bad">error</span>}
-            {p.status === "disabled" && <span className="font-normal opacity-70">disabled</span>}
+            {p.status === "disabled" && <span className="font-normal">disabled</span>}
             {!p.info.hasTests && p.status !== "disabled" && (
               <span className="badge badge-neutral">
                 no tests

@@ -7,6 +7,7 @@ import { loadBoard } from "@/lib/data";
 import { parseSelected, selectIssues } from "@/lib/lanes";
 
 export const dynamic = "force-dynamic";
+export const metadata = { title: "Board · Software Factory Board" };
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ project?: string | string[] }> }) {
   await requireAccess("viewer");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useId } from "react";
 import type { FormState } from "@/auth/actions";
 
 export interface AuthField {
@@ -27,6 +27,7 @@ export function AuthForm({
   hidden?: Record<string, string>;
 }) {
   const [state, formAction, pending] = useActionState(action, {});
+  const errorId = useId();
 
   if (state.notice) {
     return (
@@ -40,7 +41,7 @@ export function AuthForm({
     <form action={formAction} className="space-y-4">
       {hidden && Object.entries(hidden).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
       {state.error && (
-        <p role="alert" className="alert alert-error">
+        <p id={errorId} role="alert" className="alert alert-error">
           {state.error}
         </p>
       )}
@@ -56,7 +57,8 @@ export function AuthForm({
             autoComplete={f.autoComplete}
             defaultValue={f.type === "email" ? state.email : undefined}
             required
-            aria-describedby={f.hint ? `${f.name}-hint` : undefined}
+            aria-invalid={state.error ? true : undefined}
+            aria-describedby={[f.hint ? `${f.name}-hint` : null, state.error ? errorId : null].filter(Boolean).join(" ") || undefined}
             className={input}
           />
           {f.hint && (
