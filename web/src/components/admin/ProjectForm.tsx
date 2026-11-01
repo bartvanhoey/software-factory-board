@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useEffect, useId, useRef } from "react";
-import { createProjectAction, saveProjectAction, setProjectArchivedAction, setProjectEnabledAction, type ProjectState } from "@/auth/project-actions";
+import { useActionState, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { createProjectAction, lookupBranchAction, saveProjectAction, setProjectArchivedAction, setProjectEnabledAction, type ProjectState } from "@/auth/project-actions";
 import { errorField } from "@/auth/project-fields";
+import { COMMAND_PRESETS, nameFromRepo } from "./projectDefaults";
 
 export interface ProjectValues {
   name: string;
@@ -27,6 +28,9 @@ export const NEW_PROJECT: ProjectValues = {
   enabled: false,
   version: 0,
 };
+
+/** The inputs that sit under "Advanced settings" when adding a project: an error about one of them opens that section. */
+const ADVANCED_FIELDS = ["stack", "maxTurns", "qaMaxTurns", "reviewMaxTurns", "maxReworks", "commandBuild", "commandTest"];
 
 const input = "mt-1 block w-full rounded border border-zinc-300 bg-white px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900";
 const button = "rounded border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 aria-disabled:opacity-60 dark:border-zinc-700 dark:hover:bg-zinc-800";
@@ -97,6 +101,56 @@ export function ProjectForm({ mode, values, isAdmin, locked = false }: { mode: "
   const alertRef = useRef<HTMLParagraphElement>(null);
   const failing = errorField(state.error);
 
+  // Adding a project asks for a repository, a name and a branch; the rest is under "Advanced settings". The name, the
+  // branch and the commands are suggested from what was entered, and a suggestion never replaces what a person typed.
+  const creating = !editing;
+  const nameRef = useRef<HTMLInputElement>(null);
+  const branchRef = useRef<HTMLInputElement>(null);
+  const buildRef = useRef<HTMLInputElement>(null);
+  const testRef = useRef<HTMLInputElement>(null);
+  const typedBy = useRef({ name: false, branch: false, build: false, test: false });
+  const lookupSeq = useRef(0);
+  const [lookupNote, setLookupNote] = useState("");
+  const [presetNote, setPresetNote] = useState("");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const advancedFailing = failing !== null && ADVANCED_FIELDS.includes(failing);
+
+  // A project that was added leaves an empty form again, with nothing typed and no notes.
+  useEffect(() => {
+    if (!creating || !state.message) return;
+    typedBy.current = { name: false, branch: false, build: false, test: false };
+    setLookupNote("");
+    setPresetNote("");
+    setAdvancedOpen(false);
+  }, [state, creating]);
+
+  const suggestName = (repo: string) => {
+    if (!typedBy.current.name && nameRef.current) nameRef.current.value = nameFromRepo(repo);
+  };
+
+  async function findBranch(repo: string) {
+    const value = repo.trim();
+    if (typedBy.current.branch || !/^[^/\s]+\/[^/\s]+$/.test(value)) return;
+    const seq = ++lookupSeq.current;
+    setLookupNote("Looking up the default branch on GitHub…");
+    const found: { branch?: string; error?: string } = await lookupBranchAction(value).catch(() => ({ error: "Could not look it up." }));
+    if (seq !== lookupSeq.current) return; // another repository was entered while this one was being looked up
+    if (found.branch && !typedBy.current.branch && branchRef.current) {
+      branchRef.current.value = found.branch;
+      setLookupNote(`Default branch read from GitHub: ${found.branch}.`);
+    } else {
+      setLookupNote(`${found.error ?? ""} Using ${branchRef.current?.value || "main"}; change it if that is wrong.`.trim());
+    }
+  }
+
+  function suggestCommands(stack: string) {
+    if (!isAdmin) return;
+    const preset = COMMAND_PRESETS[stack];
+    if (!typedBy.current.build && buildRef.current) buildRef.current.value = preset?.build ?? "";
+    if (!typedBy.current.test && testRef.current) testRef.current.value = preset?.test ?? "";
+    setPresetNote(preset ? "Suggested for this stack. Check them before you switch the project on." : "");
+  }
+
   // After a failed save, move focus to the input the error is about (or, if it is about none, to the message), so a
   // keyboard or screen reader user lands on the problem instead of at the top of the page.
   useEffect(() => {
@@ -110,6 +164,94 @@ export function ProjectForm({ mode, values, isAdmin, locked = false }: { mode: "
     if (pending) e.preventDefault(); // aria-disabled keeps focus on the button; this stops a second submit
   };
 
+  const nameField = (
+    <Field label="Name (required)" hint={editing ? "Cannot be changed." : "Lowercase letters, digits and dashes. Suggested from the repository."} {...field("name")}>
+      {(a) =>
+        editing ? (
+          <>
+            <input type="hidden" name="name" value={values.name} />
+            <input className={input} value={values.name} readOnly {...a} />
+          </>
+        ) : (
+          <input
+            ref={nameRef}
+            className={input}
+            name="name"
+            defaultValue={typed(state, "name", values.name)}
+            onChange={() => (typedBy.current.name = true)}
+            required
+            maxLength={64}
+            pattern="[a-z0-9]+(-[a-z0-9]+)*"
+            title="Lowercase letters, digits and dashes"
+            autoComplete="off"
+            {...a}
+          />
+        )
+      }
+    </Field>
+  );
+  const repoField = (
+    <Field label="GitHub repository (required)" hint="owner/name" {...field("repo")}>
+      {(a) => (
+        <input
+          className={input}
+          name="repo"
+          defaultValue={typed(state, "repo", values.repo)}
+          onChange={creating ? (e) => suggestName(e.currentTarget.value) : undefined}
+          onBlur={creating ? (e) => void findBranch(e.currentTarget.value) : undefined}
+          required
+          maxLength={200}
+          pattern="[A-Za-z0-9][A-Za-z0-9\-]*/[A-Za-z0-9_][A-Za-z0-9._\-]*"
+          title="owner/name, as on GitHub"
+          autoComplete="off"
+          {...a}
+        />
+      )}
+    </Field>
+  );
+  const branchField = (
+    <Field label="Default branch" hint={creating ? lookupNote || "Looked up on GitHub when you enter the repository." : undefined} {...field("defaultBranch")}>
+      {(a) => (
+        <input
+          ref={branchRef}
+          className={input}
+          name="defaultBranch"
+          defaultValue={typed(state, "defaultBranch", values.defaultBranch)}
+          onChange={() => (typedBy.current.branch = true)}
+          maxLength={100}
+          autoComplete="off"
+          {...a}
+        />
+      )}
+    </Field>
+  );
+  const stackField = (
+    <Field label="Stack" {...field("stack")}>
+      {(a) => (
+        <select className={input} name="stack" defaultValue={typed(state, "stack", values.stack)} onChange={creating ? (e) => suggestCommands(e.currentTarget.value) : undefined} {...a}>
+          {["dotnet", "node", "python", "other"].map((s) => (
+            <option key={s}>{s}</option>
+          ))}
+        </select>
+      )}
+    </Field>
+  );
+  // Adding: the three things that matter, then the rest folded away. Editing: everything, as before.
+  const advanced = (rest: ReactNode) =>
+    creating ? (
+      <details open={advancedOpen || advancedFailing} onToggle={(e) => setAdvancedOpen(e.currentTarget.open)} className="rounded border border-zinc-200 p-3 dark:border-zinc-800">
+        <summary className="cursor-pointer text-sm font-medium hover:underline">
+          Advanced settings <span className="font-normal text-zinc-500 dark:text-zinc-400">(the defaults suit most projects)</span>
+        </summary>
+        <div className="mt-3 space-y-3">
+          {stackField}
+          {rest}
+        </div>
+      </details>
+    ) : (
+      rest
+    );
+
   return (
     <form ref={formRef} action={action} className="space-y-3">
       {editing && <input type="hidden" name="version" value={values.version} />}
@@ -117,35 +259,27 @@ export function ProjectForm({ mode, values, isAdmin, locked = false }: { mode: "
       <fieldset disabled={locked} className="space-y-3">
         <legend className="sr-only">{editing ? `Settings of ${values.name}` : "New project"}</legend>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Name (required)" hint={editing ? "Cannot be changed." : "Lowercase letters, digits and dashes, for example my-project."} {...field("name")}>
-            {(a) =>
-              editing ? (
-                <>
-                  <input type="hidden" name="name" value={values.name} />
-                  <input className={input} value={values.name} readOnly {...a} />
-                </>
-              ) : (
-                <input className={input} name="name" defaultValue={typed(state, "name", values.name)} required maxLength={64} pattern="[a-z0-9]+(-[a-z0-9]+)*" title="Lowercase letters, digits and dashes" autoComplete="off" {...a} />
-              )
-            }
-          </Field>
-          <Field label="GitHub repository (required)" hint="owner/name" {...field("repo")}>
-            {(a) => <input className={input} name="repo" defaultValue={typed(state, "repo", values.repo)} required maxLength={200} pattern="[A-Za-z0-9][A-Za-z0-9\-]*/[A-Za-z0-9_][A-Za-z0-9._\-]*" title="owner/name, as on GitHub" autoComplete="off" {...a} />}
-          </Field>
-          <Field label="Default branch" {...field("defaultBranch")}>
-            {(a) => <input className={input} name="defaultBranch" defaultValue={typed(state, "defaultBranch", values.defaultBranch)} maxLength={100} autoComplete="off" {...a} />}
-          </Field>
-          <Field label="Stack" {...field("stack")}>
-            {(a) => (
-              <select className={input} name="stack" defaultValue={typed(state, "stack", values.stack)} {...a}>
-                {["dotnet", "node", "python", "other"].map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-            )}
-          </Field>
+          {creating ? (
+            <>
+              {repoField}
+              {nameField}
+              {branchField}
+              {/* The branch and its note change without anyone typing there, so say so to a screen reader too. */}
+              <p role="status" className="sr-only">
+                {lookupNote}
+              </p>
+            </>
+          ) : (
+            <>
+              {nameField}
+              {repoField}
+              {branchField}
+              {stackField}
+            </>
+          )}
         </div>
 
+        {advanced(<>
         <fieldset className="flex flex-wrap gap-x-4 gap-y-1">
           <legend className="mb-1 text-xs font-medium">Lanes that run for this project</legend>
           {([["laneBuild", "build", values.lanes.build], ["laneQa", "qa", values.lanes.qa], ["laneReview", "review", values.lanes.review]] as const).map(([name, label, on]) => (
@@ -176,11 +310,16 @@ export function ProjectForm({ mode, values, isAdmin, locked = false }: { mode: "
           <fieldset className="grid gap-3 sm:grid-cols-2">
             <legend className="mb-1 text-xs font-medium">Commands (run in the runner container)</legend>
             <Field label="Build command" hint="One line. Used when there is no test command." {...field("commandBuild")}>
-              {(a) => <input className={`${input} font-mono`} name="commandBuild" defaultValue={typed(state, "commandBuild", values.commands.build ?? "")} maxLength={500} autoComplete="off" {...a} />}
+              {(a) => <input ref={buildRef} className={`${input} font-mono`} name="commandBuild" defaultValue={typed(state, "commandBuild", values.commands.build ?? "")} onChange={() => (typedBy.current.build = true)} maxLength={500} autoComplete="off" {...a} />}
             </Field>
             <Field label="Test command" hint="One line. Leave empty for a project without tests." {...field("commandTest")}>
-              {(a) => <input className={`${input} font-mono`} name="commandTest" defaultValue={typed(state, "commandTest", values.commands.test ?? "")} maxLength={500} autoComplete="off" {...a} />}
+              {(a) => <input ref={testRef} className={`${input} font-mono`} name="commandTest" defaultValue={typed(state, "commandTest", values.commands.test ?? "")} onChange={() => (typedBy.current.test = true)} maxLength={500} autoComplete="off" {...a} />}
             </Field>
+            {presetNote && (
+              <p role="status" className="text-xs text-zinc-500 sm:col-span-2 dark:text-zinc-400">
+                {presetNote}
+              </p>
+            )}
           </fieldset>
         ) : (
           <p className="text-xs text-zinc-500 dark:text-zinc-400">An Administrator sets the build and test commands and switches the project on.</p>
@@ -192,6 +331,7 @@ export function ProjectForm({ mode, values, isAdmin, locked = false }: { mode: "
             Switch it on now
           </label>
         )}
+        </>)}
       </fieldset>
 
       {!locked && (
