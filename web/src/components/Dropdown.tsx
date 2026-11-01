@@ -34,11 +34,14 @@ export function Dropdown({ label, trigger, children }: { label: string; trigger:
     <details ref={ref} className="relative">
       <summary
         aria-label={label}
-        className="flex size-9 cursor-pointer list-none items-center justify-center rounded-full bg-accent-soft text-sm font-semibold text-accent-soft-fg transition-shadow hover:ring-2 hover:ring-line-strong [&::-webkit-details-marker]:hidden"
+        className="flex size-9 cursor-pointer list-none pointer-coarse:size-10 items-center justify-center rounded-full bg-accent-soft text-sm font-semibold text-accent-soft-fg transition-shadow hover:ring-2 hover:ring-line-strong [&::-webkit-details-marker]:hidden"
       >
         {trigger}
       </summary>
-      <div className="absolute right-0 z-30 mt-2 w-64 rounded-xl border border-line bg-surface p-1.5 shadow-lg">{children}</div>
+      {/* On a touch screen every link and button in the menu is at least 40px tall. */}
+      <div className="absolute right-0 z-30 mt-2 w-64 rounded-xl border border-line bg-surface p-1.5 shadow-lg pointer-coarse:[&_a]:flex pointer-coarse:[&_a]:min-h-10 pointer-coarse:[&_a]:items-center pointer-coarse:[&_button]:flex pointer-coarse:[&_button]:min-h-10 pointer-coarse:[&_button]:items-center">
+        {children}
+      </div>
     </details>
   );
 }
