@@ -51,7 +51,7 @@ beforeEach(() => {
   world.token = undefined;
   createIssue.mockReset();
   createIssue.mockResolvedValue({ ok: true, number: 42, url: "https://github.com/Owner/Demo/issues/42" });
-  vi.stubEnv("ISSUE_GITHUB_TOKEN", "issue-token");
+  vi.stubEnv("CREATE_ISSUE_GITHUB_TOKEN", "issue-token");
 });
 
 afterEach(() => vi.unstubAllEnvs());

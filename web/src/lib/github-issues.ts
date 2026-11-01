@@ -45,12 +45,12 @@ export async function createGitHubIssue(
     return { ok: false, error: "Could not reach GitHub. Try again." };
   }
 
-  if (response.status === 401) return { ok: false, error: "GitHub rejected ISSUE_GITHUB_TOKEN. Check its configuration." };
+  if (response.status === 401) return { ok: false, error: "GitHub rejected CREATE_ISSUE_GITHUB_TOKEN. Check its configuration." };
   if (response.status === 403 || response.status === 429) {
     return { ok: false, error: "GitHub denied the request or is rate-limiting it. Check Issues: write and repository access." };
   }
   if (response.status === 404) {
-    return { ok: false, error: "GitHub could not find the repository, or ISSUE_GITHUB_TOKEN cannot access it." };
+    return { ok: false, error: "GitHub could not find the repository, or CREATE_ISSUE_GITHUB_TOKEN cannot access it." };
   }
   if (response.status === 422) return { ok: false, error: "GitHub rejected this issue. Check its title, body, and labels." };
   if (!response.ok) return { ok: false, error: `GitHub returned status ${response.status} while creating the issue.` };

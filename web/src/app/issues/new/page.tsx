@@ -20,7 +20,7 @@ export default async function NewIssuePage({ searchParams }: { searchParams: Pro
     <main>
       <p className="mb-4 text-sm"><Link className="link" href="/">← Back to board</Link></p>
       <h1 className="page-title mb-2">Create a GitHub issue</h1>
-      <CreateIssueForm projects={projects} configured={!!process.env.ISSUE_GITHUB_TOKEN} initialProject={initialProject} />
+      <CreateIssueForm projects={projects} configured={!!process.env.CREATE_ISSUE_GITHUB_TOKEN} initialProject={initialProject} />
     </main>
   );
 }

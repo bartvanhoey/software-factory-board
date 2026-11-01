@@ -41,7 +41,7 @@ Fill in `.env`:
 | `CLAUDE_CODE_OAUTH_TOKEN` | Your Claude Code token (runner only) |
 | `RUNNER_GITHUB_TOKEN` | A token that can write issues, pull requests and contents (runner only) |
 | `BOARD_GITHUB_TOKEN` | A separate read-only token for the board. Leave it empty to see demo data |
-| `ISSUE_GITHUB_TOKEN` | Optional separate token with Issues: read/write for creating issues from the board |
+| `CREATE_ISSUE_GITHUB_TOKEN` | Optional separate token with Issues: read/write for creating issues from the board |
 | `MFA_ENCRYPTION_KEY` | 32 random bytes, base64. The web container refuses to start without it |
 | `RUNNER_API_TOKEN` | 32 or more random bytes, base64. The runner uses it to fetch the projects from the web app. The web container refuses to start without it |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | The first administrator (12 to 128 characters) |
@@ -102,7 +102,7 @@ Administrators get an **Admin** link in the header, and Project managers a **Pro
 
 - **Users** (`/admin/users`): give or remove roles, disable or enable an account, reset a password (a temporary one is shown once and must be changed at next login), require MFA for a user, reset a user's MFA, and mark an email address as confirmed. Accounts waiting for a role are listed first. Users are disabled, never deleted. An administrator cannot remove their own role, disable themselves or reset their own password, at least one active administrator always remains, and an administrator who has MFA cannot be demoted in the app (disable the account instead).
 - **Projects** (`/admin/projects`): the GitHub repositories the factory works on. A project has a name (fixed once created), a repository, a default branch, a stack, the lanes that run for it, limits on agent turns and automatic reworks, and a build and a test command. Administrators and Project managers can add and edit projects. **A project a Project manager adds starts switched off**, and only an Administrator can switch a project on or set its commands. A Project manager can edit a project only while it is switched off, so a project an Administrator vetted cannot be pointed at another repository: the commands run in the runner container, which holds your GitHub and Claude tokens. Anyone who can label issues in a switched-on project's repository can make the factory build, so switch a project on only for a repository you trust. A project is never deleted, so its history stays: an Administrator can archive a switched-off project, which hides it from the board and the runner, and restore it later from the **Archived** section (it comes back switched off). An archived project cannot be edited, and its name and repository stay reserved. Every change is in the audit log with the old and new values.
-- **Audit log** (`/admin/audit`): who did what, newest first, filterable by action and user. It is read-only, and database triggers keep entries from being edited or deleted. It records logins, registrations, role and account changes, password and MFA resets, and every change made by the break-glass command.
+- **Audit log** (`/admin/audit`): who did what, newest first, filterable by action and user. It is read-only, and database triggers keep entries from being edited or deleted. It records logins, registrations, issue creation, role and account changes, password and MFA resets, and every change made by the break-glass command.
 
 ## Multi-factor authentication
 
@@ -149,7 +149,7 @@ Access to the server is the authorisation: anyone who can run `docker exec` can 
 | `RUNNER_API_TOKEN` | yes | | Lets the runner fetch the projects from the web app (at least 32 random bytes, base64) |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | first start | | Creates the first administrator when none exists |
 | `BOARD_GITHUB_TOKEN` | no | | Read-only token for the board. Empty means demo data |
-| `ISSUE_GITHUB_TOKEN` | no | | Optional Issues: read/write token for board issue creation. The token's account authors those issues |
+| `CREATE_ISSUE_GITHUB_TOKEN` | no | | Optional Issues: read/write token for board issue creation. The token's account authors those issues |
 | `RUNNER_GITHUB_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN` | for the runner | | Runner credentials; the runner token is never given to the web container |
 | `COOKIE_SECURE` | no | on in production | `false` for plain http on localhost |
 | `TRUST_PROXY` | no | `false` | Believe `X-Forwarded-For` from a proxy you control |

@@ -47,8 +47,8 @@ export async function createIssueAction(_previous: CreateIssueState, form: FormD
     return { error: "Choose an enabled project.", values };
   }
 
-  const token = process.env.ISSUE_GITHUB_TOKEN;
-  if (!token) return { error: "Issue creation is not configured. Set ISSUE_GITHUB_TOKEN for the web service.", values };
+  const token = process.env.CREATE_ISSUE_GITHUB_TOKEN;
+  if (!token) return { error: "Issue creation is not configured. Set CREATE_ISSUE_GITHUB_TOKEN for the web service.", values };
 
   const created = await createGitHubIssue(
     project.repo,
