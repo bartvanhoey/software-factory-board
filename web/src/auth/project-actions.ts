@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { denyNonAdmin, type AdminCtx, type Done } from "./admin";
 import { requestContext, requireAccess, type AppSession } from "./dal";
 import { getDb } from "./db";
-import { lookupDefaultBranch } from "@/lib/repo";
+import { lookupDefaultBranch } from "../lib/repo";
 import { createProject, getProject, setProjectArchived, setProjectEnabled, updateProject } from "./projects";
 import { hasRole } from "./users";
 
