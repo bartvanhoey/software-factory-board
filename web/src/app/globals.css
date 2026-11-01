@@ -3,16 +3,176 @@
 /* Dark mode follows the `dark` class on <html>, set by ThemeToggle / the inline script in layout.tsx. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ── Design tokens ──────────────────────────────────────────────────────────
+   Every color in the UI comes from these variables, so light/dark is defined
+   once here and components never need `dark:` pairs. */
 :root {
   color-scheme: light;
+  --bg: #f8f8fa;
+  --surface: #ffffff;
+  --subtle: #f2f2f5;
+  --line: #e4e4ea;
+  --line-strong: #d1d1da;
+  --fg: #16161d;
+  --muted: #6b6b7b;
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-fg: #ffffff;
+  --accent-soft: #eef0ff;
+  --accent-soft-fg: #3730a3;
+
+  --ok-bg: #ecfdf3;
+  --ok-line: #a7f0c4;
+  --ok-fg: #0b6b36;
+  --warn-bg: #fffbeb;
+  --warn-line: #fbdf8f;
+  --warn-fg: #8a4b06;
+  --bad-bg: #fef2f2;
+  --bad-line: #fbc4c4;
+  --bad-fg: #b01e1e;
 }
 
 :root.dark {
   color-scheme: dark;
+  --bg: #0b0b10;
+  --surface: #14141b;
+  --subtle: #1b1b24;
+  --line: #262633;
+  --line-strong: #353546;
+  --fg: #ededf2;
+  --muted: #9a9aad;
+  --accent: #818cf8;
+  --accent-hover: #a5b4fc;
+  --accent-fg: #0b0b10;
+  --accent-soft: #1e1f3d;
+  --accent-soft-fg: #c7d2fe;
+
+  --ok-bg: #0c2118;
+  --ok-line: #1c4a31;
+  --ok-fg: #6ee7a3;
+  --warn-bg: #261c07;
+  --warn-line: #5a4210;
+  --warn-fg: #fcd34d;
+  --bad-bg: #2a1012;
+  --bad-line: #61222a;
+  --bad-fg: #fca5a5;
+}
+
+@theme inline {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-subtle: var(--subtle);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-fg: var(--accent-soft-fg);
+  --color-ok: var(--ok-fg);
+  --color-warn: var(--warn-fg);
+  --color-bad: var(--bad-fg);
 }
 
 body {
-  @apply bg-zinc-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100;
+  @apply bg-bg text-fg font-sans text-[15px] leading-relaxed antialiased;
+}
+
+h1, h2, h3 {
+  @apply tracking-tight;
+}
+
+:focus-visible {
+  @apply outline-2 outline-offset-2 outline-accent;
+}
+
+/* ── Shared components ─────────────────────────────────────────────────────── */
+@layer components {
+  .page-title {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+  .page-lead {
+    @apply mt-1 mb-6 max-w-3xl text-sm text-muted;
+  }
+
+  .card {
+    @apply rounded-xl border border-line bg-surface shadow-xs;
+  }
+
+  /* Buttons */
+  .btn {
+    @apply inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-line-strong bg-surface px-3.5 py-1.5 text-sm font-medium whitespace-nowrap text-fg shadow-xs transition-colors hover:bg-subtle disabled:cursor-not-allowed disabled:opacity-60 aria-disabled:cursor-not-allowed aria-disabled:opacity-60;
+  }
+  .btn-primary {
+    @apply border-transparent bg-accent text-accent-fg hover:bg-accent-hover;
+  }
+  .btn-sm {
+    @apply min-h-8 px-2.5 py-1 text-xs;
+  }
+  .btn-block {
+    @apply w-full;
+  }
+
+  /* Form controls */
+  .input {
+    @apply block min-h-9 w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-fg shadow-xs transition-colors placeholder:text-muted focus:border-accent focus:outline-2 focus:-outline-offset-1 focus:outline-accent disabled:opacity-60;
+  }
+  .label {
+    @apply block text-sm font-medium;
+  }
+  .hint {
+    @apply mt-1 text-xs text-muted;
+  }
+
+  /* Links */
+  .link {
+    @apply font-medium text-accent underline-offset-2 hover:underline;
+  }
+
+  /* Messages */
+  .alert {
+    @apply rounded-lg border px-3.5 py-2.5 text-sm;
+  }
+  .alert-error {
+    @apply border-(--bad-line) bg-(--bad-bg) text-(--bad-fg);
+  }
+  .alert-success {
+    @apply border-(--ok-line) bg-(--ok-bg) text-(--ok-fg);
+  }
+  .alert-warn {
+    @apply border-(--warn-line) bg-(--warn-bg) text-(--warn-fg);
+  }
+
+  /* Status pills */
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap;
+  }
+  .badge-neutral {
+    @apply bg-subtle text-muted;
+  }
+  .badge-ok {
+    @apply bg-(--ok-bg) text-(--ok-fg);
+  }
+  .badge-warn {
+    @apply bg-(--warn-bg) text-(--warn-fg);
+  }
+  .badge-bad {
+    @apply bg-(--bad-bg) text-(--bad-fg);
+  }
+  .badge-accent {
+    @apply bg-accent-soft text-accent-soft-fg;
+  }
+
+  /* Disclosure panels (<details>) */
+  .panel {
+    @apply rounded-xl border border-line bg-surface p-4 shadow-xs;
+  }
+  .panel > summary {
+    @apply cursor-pointer text-sm font-medium select-none hover:text-accent;
+  }
 }
 
 /* Phones: form fields at 16px (iOS Safari zooms into anything smaller when it gets focus). */
@@ -42,4 +202,9 @@ body {
   label:has(> input[type="checkbox"], > input[type="radio"]) {
     padding-block: 0.375rem;
   }
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--accent);
 }

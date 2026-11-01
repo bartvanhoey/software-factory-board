@@ -11,7 +11,7 @@ export default async function RegisterPage() {
   if (await getSession()) redirect("/");
   return (
     <AuthCard title="Register">
-      <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="mb-4 text-sm text-muted">
         A new account has no access until an administrator grants it a role.
       </p>
       <AuthForm
@@ -23,9 +23,9 @@ export default async function RegisterPage() {
           { name: "confirm", label: "Repeat password", type: "password", autoComplete: "new-password" },
         ]}
       />
-      <p className="mt-6 text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="mt-6 text-sm text-muted">
         Already registered?{" "}
-        <Link href="/login" className="font-medium underline">
+        <Link href="/login" className="link">
           Log in
         </Link>
       </p>

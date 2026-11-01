@@ -15,7 +15,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <AuthCard title="Log in">
       {(verified === "1" || reset === "1") && (
-        <p role="status" className="mb-4 rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+        <p role="status" className="mb-4 alert alert-success">
           {reset === "1" ? "Your password was changed. Log in with the new password." : "Your email address is confirmed. Log in to continue."}
         </p>
       )}
@@ -29,14 +29,14 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       />
       {mail && (
         <p className="mt-4 text-sm">
-          <Link href="/forgot-password" className="text-zinc-600 underline dark:text-zinc-400">
+          <Link href="/forgot-password" className="text-muted underline">
             Forgot your password?
           </Link>
         </p>
       )}
-      <p className="mt-6 text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="mt-6 text-sm text-muted">
         No account yet?{" "}
-        <Link href="/register" className="font-medium underline">
+        <Link href="/register" className="link">
           Register
         </Link>
       </p>

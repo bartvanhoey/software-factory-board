@@ -7,7 +7,7 @@ import { markEmailVerifiedAction, resetMfaAction, resetPasswordAction, saveRoles
 const ROLES = ["admin", "issue-admin", "viewer"] as const;
 const HIDE_AFTER_MS = 60_000;
 const button =
-  "rounded border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-700 dark:hover:bg-zinc-800";
+  "btn btn-sm";
 
 /** The plaintext is removed from the screen after a minute or on request, so an unattended page does not keep it. */
 function TemporaryPassword({ value }: { value: string }) {
@@ -19,7 +19,7 @@ function TemporaryPassword({ value }: { value: string }) {
   if (!visible) return <p className="mt-1">Temporary password hidden. Reset again to get a new one.</p>;
   return (
     <p className="mt-1">
-      Temporary password: <code className="select-all rounded bg-amber-100 px-1 py-0.5 font-mono text-sm text-amber-950 dark:bg-amber-900 dark:text-amber-100">{value}</code>{" "}
+      Temporary password: <code className="select-all rounded-md bg-(--warn-bg) px-1.5 py-0.5 font-mono text-sm text-(--warn-fg)">{value}</code>{" "}
       <button type="button" onClick={() => setVisible(false)} className="underline">
         Hide
       </button>
@@ -30,14 +30,14 @@ function TemporaryPassword({ value }: { value: string }) {
 function Feedback({ state }: { state: AdminState }) {
   if (state.error) {
     return (
-      <p role="alert" className="mt-1 text-xs text-red-700 dark:text-red-300">
+      <p role="alert" className="mt-1 text-xs text-bad">
         {state.error}
       </p>
     );
   }
   if (!state.message) return null;
   return (
-    <div role="status" className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+    <div role="status" className="mt-1 text-xs text-muted">
       <p>{state.message}</p>
       {state.temporaryPassword && <TemporaryPassword key={state.temporaryPassword} value={state.temporaryPassword} />}
     </div>
@@ -112,7 +112,7 @@ export function UserControls({
 
       {isSelf ? (
         <div className="space-y-2">
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="text-xs text-muted">
             This is you: you cannot remove your own admin role, disable yourself or reset your own password here. Stopping the MFA requirement keeps your authenticator; turn that off at <code className="font-mono">/account/mfa</code>.
           </p>
           {requireForm}
@@ -145,7 +145,7 @@ export function UserControls({
           )}
           {requireForm}
           {isAdmin ? (
-            <p className="basis-full text-xs text-zinc-500 dark:text-zinc-400">Stopping the requirement keeps an admin&apos;s authenticator. An admin&apos;s MFA can only be reset from the server:<code className="font-mono">{BREAKGLASS_RESET_MFA}</code>
+            <p className="basis-full text-xs text-muted">Stopping the requirement keeps an admin&apos;s authenticator. An admin&apos;s MFA can only be reset from the server:<code className="font-mono">{BREAKGLASS_RESET_MFA}</code>
             </p>
           ) : (
             mfaEnabled && (

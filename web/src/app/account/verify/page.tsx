@@ -21,25 +21,25 @@ export default async function VerifyPendingPage({ searchParams }: { searchParams
   return (
     <AuthCard title="Confirm your email address">
       {failed ? (
-        <p role="alert" className="text-sm text-red-800 dark:text-red-300">
+        <p role="alert" className="alert alert-error">
           Your account was created, but we could not send the email to <strong>{session.email}</strong> just now. Try the button below in a little while.
         </p>
       ) : waiting ? (
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="text-sm text-muted">
           We sent a link to <strong>{session.email}</strong>. Open it to continue (log in first if you are asked to). It works once and expires after 24 hours.
           If nothing arrives within a few minutes, check your spam folder, or ask for a new link. A new link replaces the old one.
         </p>
       ) : (
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="text-sm text-muted">
           Before you continue, confirm that <strong>{session.email}</strong> is yours. We have not emailed you a link yet: press the button below and we will send one.
         </p>
       )}
       <ResendButton />
-      <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="mt-4 text-sm text-muted">
         Wrong address, or no mail ever arrives? Ask an administrator to confirm it for you.
       </p>
       <form action={logoutAction} className="mt-6">
-        <button type="submit" className="rounded border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800">
+        <button type="submit" className="btn">
           Log out
         </button>
       </form>

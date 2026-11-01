@@ -1,12 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 type Theme = "system" | "light" | "dark";
 
 const ORDER: Theme[] = ["system", "light", "dark"];
 const LABEL: Record<Theme, string> = { system: "Auto", light: "Light", dark: "Dark" };
-const ICON: Record<Theme, string> = { system: "◐", light: "☀", dark: "☾" };
+const ICON: Record<Theme, ReactNode> = {
+  system: <path d="M12 3a9 9 0 1 0 0 18V3Z" />,
+  light: (
+    <>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </>
+  ),
+  dark: <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />,
+};
 
 function apply(theme: Theme) {
   const dark = theme === "dark" || (theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
@@ -48,11 +57,13 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={cycle}
-      title="Switch colour theme"
+      title={`Theme: ${LABEL[current]}`}
       aria-label={`Colour theme: ${LABEL[current]}. Click to change.`}
-      className="rounded-md border border-zinc-300 px-2 py-2 text-sm sm:py-1 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+      className="flex size-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-subtle hover:text-fg"
     >
-      <span aria-hidden="true">{ICON[current]}</span> {LABEL[current]}
+      <svg viewBox="0 0 24 24" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        {ICON[current]}
+      </svg>
     </button>
   );
 }
