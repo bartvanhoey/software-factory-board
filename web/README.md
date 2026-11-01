@@ -30,7 +30,6 @@ For live data, set `BOARD_GITHUB_TOKEN` (and drop `FACTORY_DEMO`); without it th
 | `BOARD_GITHUB_TOKEN` | | read access (issues, pull requests, checks) to every registered project's repo. |
 | `CREATE_ISSUE_GITHUB_TOKEN` | | Optional separate token with Issues: read/write to create issues from the board. The token's GitHub account is the issue author. |
 | `FACTORY_DEMO` | | `1` forces demo data |
-| `FACTORY_PROJECTS_DIR` | `../projects` | folder whose `*.json` files are imported once, when the project table is empty |
 | `RUNNER_API_TOKEN` | | required: the secret the runner presents to `GET /api/internal/projects` (at least 32 random bytes, base64) |
 | `AUTH_DB_PATH`, `MFA_ENCRYPTION_KEY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `COOKIE_SECURE`, ... | | login settings, see the configuration reference in the [project description](../docs/project-description.md) |
 

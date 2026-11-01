@@ -20,7 +20,7 @@ No source code or build needed: you only need [Docker](https://docs.docker.com/g
 
    Run every later `docker compose` command with the same `-f docker-compose.release.yml`, from this same folder.
 
-4. Open <http://localhost:2999> and continue with steps 4 and 5 of [Getting Started](../README.md#getting-started). The release setup has no `projects/` folder, so add your repositories on the **Projects** screen.
+4. Open <http://localhost:2999> and continue with steps 4 and 5 of [Getting Started](../README.md#getting-started). Add your repositories on the **Projects** screen.
 
 ## Publishing a release (maintainers)
 

@@ -7,8 +7,7 @@
   "types": "src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --no-cache",
-    "validate": "tsx scripts/validate.ts"
+    "test": "vitest run --no-cache"
   },
   "dependencies": {
     "zod": "^3.23.8"

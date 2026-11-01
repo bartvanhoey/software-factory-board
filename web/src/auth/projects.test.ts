@@ -1,10 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import type { AdminCtx } from "./admin";
 import { openDb } from "./db";
-import { MAX_PROJECTS, createProject, getProject, importProjects, listProjects, setProjectArchived, setProjectEnabled, updateProject } from "./projects";
+import { MAX_PROJECTS, createProject, getProject, listProjects, setProjectArchived, setProjectEnabled, updateProject } from "./projects";
 import { createUser, grantRole, type Role } from "./users";
 
 let db: ReturnType<typeof openDb>;
@@ -292,61 +289,5 @@ describe("the table", () => {
     createProject(db, admin, { name: "other", repo: "Owner/Other" }, ctx);
     db.prepare("UPDATE projects SET config = '{\"defaultBranch\":\"--bad\"}' WHERE name = 'demo'").run();
     expect(listProjects(db).map((p) => p.name)).toEqual(["other"]);
-  });
-});
-
-describe("importProjects", () => {
-  let dir: string;
-  beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "factory-import-"));
-  });
-  afterEach(() => rmSync(dir, { recursive: true, force: true }));
-
-  const file = (name: string, body: unknown) => writeFileSync(join(dir, name), typeof body === "string" ? body : JSON.stringify(body));
-  const quiet = () => undefined;
-
-  it("imports valid files into an empty table, once, and audits each", () => {
-    file("alpha.json", { name: "alpha", repo: "o/alpha", limits: { maxTurns: 30 }, commands: { test: "npm test" } });
-    file("beta.json", { name: "beta", repo: "o/beta", enabled: false });
-    expect(importProjects(db, dir, quiet, T0)).toEqual({ imported: ["alpha", "beta"], skipped: [] });
-    expect(getProject(db, "alpha")).toMatchObject({ limits: { maxTurns: 30 } });
-    expect(actions()).toEqual(["project.imported", "project.imported"]);
-
-    // a second start finds rows and changes nothing, even though the file now differs
-    file("alpha.json", { name: "alpha", repo: "o/alpha", limits: { maxTurns: 99 } });
-    expect(importProjects(db, dir, quiet, T0).imported).toEqual([]);
-    expect(getProject(db, "alpha")!.limits.maxTurns).toBe(30);
-  });
-
-  it("switches every imported project off, whatever its file says, and records it", () => {
-    file("alpha.json", { name: "alpha", repo: "o/alpha", enabled: true });
-    file("beta.json", { name: "beta", repo: "o/beta" });
-    importProjects(db, dir, quiet, T0);
-    expect(listProjects(db).map((p) => p.enabled)).toEqual([false, false]);
-    expect(lastDetail()).toMatchObject({ name: "beta", enabled: false });
-  });
-
-  it("skips a file that does not validate, names it, and still imports the rest", () => {
-    file("good.json", { name: "good", repo: "o/good" });
-    file("broken.json", "{ not json");
-    file("wrongname.json", { name: "other", repo: "o/other" });
-    file("toomany.json", { name: "toomany", repo: "o/toomany", limits: { maxTurns: 5000 } });
-    const logs: string[] = [];
-    const result = importProjects(db, dir, (m) => logs.push(m), T0);
-    expect(result.imported).toEqual(["good"]);
-    expect(result.skipped.sort()).toEqual(["broken.json", "toomany.json", "wrongname.json"]);
-    expect(logs.filter((l) => l.includes("skipped"))).toHaveLength(3);
-  });
-
-  it("skips a second file for a repository that is already imported", () => {
-    file("a.json", { name: "a", repo: "o/same" });
-    file("b.json", { name: "b", repo: "O/SAME" });
-    expect(importProjects(db, dir, quiet, T0)).toEqual({ imported: ["a"], skipped: ["b.json"] });
-  });
-
-  it("does nothing when the folder does not exist or is empty", () => {
-    expect(importProjects(db, join(dir, "missing"), quiet, T0)).toEqual({ imported: [], skipped: [] });
-    mkdirSync(join(dir, "sub"));
-    expect(importProjects(db, dir, quiet, T0)).toEqual({ imported: [], skipped: [] });
   });
 });

@@ -39,7 +39,6 @@ check "can write /cache"             pass sh -c 'touch /cache/.probe && rm /cach
 check "NuGet cache is on /cache"     pass sh -c '[ "$NUGET_PACKAGES" = /cache/nuget ]'
 check "can write HOME"               pass sh -c 'touch "$HOME/.probe"'
 check "/tmp is noexec"               fail sh -c 'cp /bin/true /tmp/t && /tmp/t'
-check "projects/ is read-only"       fail sh -c 'touch /app/projects/.probe'
 
 echo "== privileges"
 check "capability set is empty"      pass sh -c 'grep -q "^CapEff:[[:space:]]*0000000000000000$" /proc/self/status'
