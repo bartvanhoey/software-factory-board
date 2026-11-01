@@ -29,7 +29,7 @@ export async function TopBar() {
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-surface/85 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-2 px-4 sm:gap-4 sm:px-6">
-        <Link href="/" className="flex shrink-0 items-center gap-2.5 font-semibold tracking-tight">
+        <Link href="/" className="flex shrink-0 items-center gap-2.5 font-semibold tracking-tight pointer-coarse:min-h-10">
           <Logo />
           <span className="max-sm:sr-only">Software Factory Board</span>
         </Link>
@@ -55,7 +55,8 @@ export async function TopBar() {
           </nav>
         )}
 
-        <div className="ml-auto flex shrink-0 items-center gap-2">
+        {/* Only the theme button is a direct child button here; the log out button in the menu is not. */}
+        <div className="ml-auto flex shrink-0 items-center gap-2 pointer-coarse:[&>button]:size-10">
           <ThemeToggle />
           <UserMenu />
         </div>
