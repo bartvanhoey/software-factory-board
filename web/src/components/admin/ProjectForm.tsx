@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createProjectAction, lookupBranchAction, saveProjectAction, setProjectArchivedAction, setProjectEnabledAction, type ProjectState } from "@/auth/project-actions";
 import { errorField } from "@/auth/project-fields";
-import { COMMAND_PRESETS, nameFromRepo } from "./projectDefaults";
+import { COMMAND_PRESETS, nameFromRepo, repoFromInput } from "./projectDefaults";
 
 export interface ProjectValues {
   name: string;
@@ -30,7 +30,7 @@ export const NEW_PROJECT: ProjectValues = {
 };
 
 /** The inputs that sit under "Advanced settings" when adding a project: an error about one of them opens that section. */
-const ADVANCED_FIELDS = ["stack", "maxTurns", "qaMaxTurns", "reviewMaxTurns", "maxReworks", "commandBuild", "commandTest"];
+const ADVANCED_FIELDS = ["defaultBranch", "stack","maxTurns", "qaMaxTurns", "reviewMaxTurns", "maxReworks", "commandBuild", "commandTest"];
 
 const input = "mt-1 block w-full rounded border border-zinc-300 bg-white px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900";
 const button = "rounded border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 aria-disabled:opacity-60 dark:border-zinc-700 dark:hover:bg-zinc-800";
@@ -128,6 +128,15 @@ export function ProjectForm({ mode, values, isAdmin, locked = false }: { mode: "
     if (!typedBy.current.name && nameRef.current) nameRef.current.value = nameFromRepo(repo);
   };
 
+  // The repository field lost focus: a pasted GitHub address becomes owner/name, the name follows from it, and the
+  // branch is looked up.
+  function repoEntered(field: HTMLInputElement) {
+    const repo = repoFromInput(field.value);
+    if (repo !== field.value) field.value = repo;
+    suggestName(repo);
+    void findBranch(repo);
+  }
+
   async function findBranch(repo: string) {
     const value = repo.trim();
     if (typedBy.current.branch || !/^[^/\s]+\/[^/\s]+$/.test(value)) return;
@@ -135,12 +144,17 @@ export function ProjectForm({ mode, values, isAdmin, locked = false }: { mode: "
     setLookupNote("Looking up the default branch on GitHub…");
     const found: { branch?: string; error?: string } = await lookupBranchAction(value).catch(() => ({ error: "Could not look it up." }));
     if (seq !== lookupSeq.current) return; // another repository was entered while this one was being looked up
-    if (found.branch && !typedBy.current.branch && branchRef.current) {
-      branchRef.current.value = found.branch;
-      setLookupNote(`Default branch read from GitHub: ${found.branch}.`);
-    } else {
-      setLookupNote(`${found.error ?? ""} Using ${branchRef.current?.value || "main"}; change it if that is wrong.`.trim());
+    if (found.branch) {
+      // A branch typed while the lookup was running is the person's choice and stays.
+      if (!typedBy.current.branch && branchRef.current) {
+        branchRef.current.value = found.branch;
+        setLookupNote(`Default branch read from GitHub: ${found.branch}.`);
+      }
+      return;
     }
+    // The branch input is inside "Advanced settings": open it, so the reason and the branch that will be used are in view.
+    setLookupNote(`${found.error ?? "Could not look it up."} Using ${branchRef.current?.value || "main"}; change it if that is wrong.`);
+    setAdvancedOpen(true);
   }
 
   function suggestCommands(stack: string) {
@@ -197,8 +211,8 @@ export function ProjectForm({ mode, values, isAdmin, locked = false }: { mode: "
           className={input}
           name="repo"
           defaultValue={typed(state, "repo", values.repo)}
-          onChange={creating ? (e) => suggestName(e.currentTarget.value) : undefined}
-          onBlur={creating ? (e) => void findBranch(e.currentTarget.value) : undefined}
+          onChange={creating ? (e) => suggestName(repoFromInput(e.currentTarget.value)) : undefined}
+          onBlur={creating ? (e) => repoEntered(e.currentTarget) : undefined}
           required
           maxLength={200}
           pattern="[A-Za-z0-9][A-Za-z0-9\-]*/[A-Za-z0-9_][A-Za-z0-9._\-]*"
@@ -236,7 +250,7 @@ export function ProjectForm({ mode, values, isAdmin, locked = false }: { mode: "
       )}
     </Field>
   );
-  // Adding: the three things that matter, then the rest folded away. Editing: everything, as before.
+  // Adding: the two things that matter, then the rest folded away. Editing: everything, as before.
   const advanced = (rest: ReactNode) =>
     creating ? (
       <details open={advancedOpen || advancedFailing} onToggle={(e) => setAdvancedOpen(e.currentTarget.open)} className="rounded border border-zinc-200 p-3 dark:border-zinc-800">
@@ -244,6 +258,7 @@ export function ProjectForm({ mode, values, isAdmin, locked = false }: { mode: "
           Advanced settings <span className="font-normal text-zinc-500 dark:text-zinc-400">(the defaults suit most projects)</span>
         </summary>
         <div className="mt-3 space-y-3">
+          {branchField}
           {stackField}
           {rest}
         </div>
@@ -263,7 +278,6 @@ export function ProjectForm({ mode, values, isAdmin, locked = false }: { mode: "
             <>
               {repoField}
               {nameField}
-              {branchField}
               {/* The branch and its note change without anyone typing there, so say so to a screen reader too. */}
               <p role="status" className="sr-only">
                 {lookupNote}
