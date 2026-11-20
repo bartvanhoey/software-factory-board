@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@factory/shared": "*",
-    "next": "16.4.2",
+    "next": "16.4.5",
     "nodemailer": "10.2.1",
     "qrcode-generator": "2.0.4",
     "react": "19.3.1",

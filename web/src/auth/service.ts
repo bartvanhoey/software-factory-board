@@ -5,6 +5,7 @@ import { audit } from "./audit";
 import { transaction } from "./db";
 import { HashQueueFull, hashPassword, hashQueueFull, needsRehash, verifyDummy, verifyPassword } from "./password";
 import { checkPassword } from "./policy";
+import { ipKey } from "./request";
 import { createSession, deleteSession, purgeExpired, revokeSessions, validateSession } from "./sessions";
 import { consume, recordFailure, releaseFailure, resetFailures, retryAfter } from "./throttle";
 import { countAdmins, countPending, createUser, findUserByEmail, findUserById, grantRole, isPlainAddress, normalizeEmail } from "./users";
@@ -59,7 +60,7 @@ export async function register(db: DatabaseSync, input: { email: string; passwor
   if (countPending(db) >= PENDING_CAP) return { ok: false, error: "Registration is temporarily closed." };
 
   const allowed = ctx.ip
-    ? consume(db, `register:ip:${ctx.ip}`, REGISTER_PER_IP, HOUR, now)
+    ? consume(db, `register:ip:${ipKey(ctx.ip)}`, REGISTER_PER_IP, HOUR, now)
     : consume(db, "register:global", REGISTER_GLOBAL, HOUR, now);
   if (!allowed) return { ok: false, error: "Too many registrations. Try again later." };
 
@@ -83,7 +84,7 @@ export async function login(db: DatabaseSync, input: { email: string; password: 
   const now = ctx.now ?? Date.now();
   const email = normalizeEmail(input.email);
   const acctKey = acctThrottleKey(email ?? input.email);
-  const keys = [acctKey, ...(ctx.ip ? [`login:ip:${ctx.ip}`] : [])];
+  const keys = [acctKey, ...(ctx.ip ? [`login:ip:${ipKey(ctx.ip)}`] : [])];
 
   const blocked = Math.max(...keys.map((k) => retryAfter(db, k, now)));
   if (blocked > 0) return { ok: false, error: wait(blocked) };
@@ -183,6 +184,17 @@ export async function changePassword(
 }
 
 export type SeedResult = "seeded" | "no-config" | "admin-exists" | "email-taken";
+
+/**
+ * A warning for the log when ADMIN_PASSWORD is configured but an admin already exists: it is then not used, and a
+ * password that stays in .env (and in the container's environment) would create an admin again if the admin rows
+ * ever disappear, for example after a restored database. Null for every other outcome. Never contains the password.
+ */
+export function leftoverAdminPasswordNotice(result: SeedResult): string | null {
+  return result === "admin-exists"
+    ? "[auth] ADMIN_PASSWORD is still set, but an admin already exists, so it is not used. Remove ADMIN_PASSWORD from .env and run `docker compose up -d`: it is only needed for the first start."
+    : null;
+}
 
 /**
  * Creates the first admin from ADMIN_EMAIL/ADMIN_PASSWORD, only when no admin exists. It never touches an

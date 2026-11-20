@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.3.4 — 2026-11-08
+
+### 🔒 Security
+- `65e5491` feat(web): record an operator name and the container id for break-glass changes
+- `66eba6c` fix(web): warn at startup when ADMIN_PASSWORD is left set after the first admin exists
+
+---
+2 commits (2 pull requests) · 8 files changed · 08 Nov 2026
+
+## v1.3.3 — 2026-11-08
+
+### 🔒 Security
+- `68bb5e7` fix(web): validate the forwarded IP and limit IPv6 clients per /64
+
+---
+1 commit (1 pull request) · 6 files changed · 08 Nov 2026
+
+## v1.3.2 — 2026-11-07
+
+### 🔒 Security
+- `139f856` fix(web): only link to https://github.com URLs from the board
+- `d50ac4d` ci: publish from a release environment that only version tags can use
+- `928183a` ci: pin actions to commit SHAs and run CI before the release
+
+---
+3 commits (3 pull requests) · 6 files changed · 06 Nov – 07 Nov 2026
+
 ## v1.3.1 — 2026-11-06
 
 ### 🔒 Security

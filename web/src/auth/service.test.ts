@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { openDb } from "./db";
 import { MAX_CONCURRENT, MAX_WAITING, hashParams, hashPassword } from "./password";
-import { changePassword, login, logout, register, seedAdmin, type Ctx } from "./service";
+import { changePassword, leftoverAdminPasswordNotice, login, logout, register, seedAdmin, type Ctx } from "./service";
 import { validateSession } from "./sessions";
 import { countPending, createUser, findUserByEmail, rolesOf } from "./users";
 
@@ -140,6 +140,25 @@ describe("login", () => {
     for (let i = 0; i < 5; i++) await login(db, { email: `x${i}@example.com`, password: PW }, ctx({ ip: "3.3.3.3" }));
     expect(await login(db, { email: "user@example.com", password: PW }, ctx({ ip: "3.3.3.3" }))).toMatchObject({ error: expect.stringContaining("Too many attempts") });
     expect((await login(db, { email: "user@example.com", password: PW }, ctx({ ip: "4.4.4.4" }))).ok).toBe(true);
+  });
+
+  it("counts an IPv6 client per /64, so rotating addresses inside it does not dodge the IP limit", async () => {
+    for (let i = 0; i < 5; i++) await login(db, { email: `x${i}@example.com`, password: PW }, ctx({ ip: `2001:db8:1:2::${i + 1}` }));
+    expect(await login(db, { email: "user@example.com", password: PW }, ctx({ ip: "2001:db8:1:2:aaaa:bbbb:cccc:dddd" }))).toMatchObject({
+      error: expect.stringContaining("Too many attempts"),
+    });
+    // another /64 is another client
+    expect((await login(db, { email: "user@example.com", password: PW }, ctx({ ip: "2001:db8:1:3::1" }))).ok).toBe(true);
+  });
+
+  it("limits registrations per /64 for IPv6, and records the full address in the audit log", async () => {
+    for (let i = 0; i < 5; i++) expect((await register(db, { email: `v${i}@example.com`, password: PW }, ctx({ ip: `2001:db8:9:9::${i + 1}` }))).ok).toBe(true);
+    expect(await register(db, { email: "v9@example.com", password: PW }, ctx({ ip: "2001:db8:9:9:1:2:3:4" }))).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("Too many"),
+    });
+    const ips = (db.prepare("SELECT ip FROM audit_log WHERE action = 'user.registered' AND ip IS NOT NULL ORDER BY id").all() as { ip: string }[]).map((r) => r.ip);
+    expect(ips).toEqual(["2001:db8:9:9::1", "2001:db8:9:9::2", "2001:db8:9:9::3", "2001:db8:9:9::4", "2001:db8:9:9::5"]);
   });
 
   it("does not let a login that was hashing survive a password reset that landed meanwhile", async () => {
@@ -302,5 +321,24 @@ describe("seedAdmin", () => {
 
   it("rejects a common admin password", async () => {
     await expect(seedAdmin(db, { email: admin.email, password: "passwordpassword" })).rejects.toThrow(/too common/);
+  });
+
+  it("warns to remove ADMIN_PASSWORD once an admin exists, and only then", async () => {
+    // first start: the password was used, nothing to warn about yet
+    expect(leftoverAdminPasswordNotice(await seedAdmin(db, admin))).toBeNull();
+    // every later start with the variable still set
+    const notice = leftoverAdminPasswordNotice(await seedAdmin(db, admin));
+    expect(notice).toContain("ADMIN_PASSWORD is still set");
+    expect(notice).toContain("Remove ADMIN_PASSWORD from .env");
+    expect(notice).not.toContain(admin.password);
+    expect(notice).not.toContain(admin.email);
+  });
+
+  it("does not warn when there is no ADMIN_PASSWORD, or the email belongs to a normal account", async () => {
+    expect(leftoverAdminPasswordNotice(await seedAdmin(db, null))).toBeNull();
+    await register(db, { email: admin.email, password: PW }, ctx());
+    expect(await seedAdmin(db, admin)).toBe("email-taken");
+    expect(leftoverAdminPasswordNotice("email-taken")).toBeNull();
+    expect(leftoverAdminPasswordNotice("seeded")).toBeNull();
   });
 });
